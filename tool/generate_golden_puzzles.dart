@@ -12,7 +12,7 @@ void main() async {
   print('=== Generating Golden Puzzle Set ===\n');
   
   final generator = LevelGenerator(seed: 12345);
-  final goldenPuzzles = <Map<String, dynamic>>>[];
+  final goldenPuzzles = <Map<String, dynamic>>[];
   
   // Generate 5 easy puzzles (Chapter 1, levels 1-5)
   print('Generating Easy puzzles (Score ~2-3)...');
