@@ -1,0 +1,38 @@
+﻿[INFO] Generating build script...
+[INFO] Generating build script completed, took 442ms
+
+[INFO] Initializing inputs
+[INFO] Reading cached asset graph...
+[INFO] Reading cached asset graph completed, took 480ms
+
+[INFO] Checking for updates since last build...
+[INFO] Checking for updates since last build completed, took 1.2s
+
+[INFO] Running build...
+[INFO] Running build completed, took 57ms
+
+[INFO] Caching finalized dependency graph...
+[INFO] Caching finalized dependency graph completed, took 198ms
+
+[SEVERE] freezed on lib/features/game/presentation/controllers/game_controller.dart (cached):
+
+This builder requires Dart inputs without syntax errors.
+However, package:sun_moon_puzzle/features/game/presentation/controllers/game_controller.dart (or an existing part) contains the following errors.
+
+Try fixing the errors and re-running the build.
+
+[SEVERE] riverpod_generator on lib/features/game/presentation/controllers/game_controller.dart (cached):
+
+This builder requires Dart inputs without syntax errors.
+However, package:sun_moon_puzzle/features/game/presentation/controllers/game_controller.dart (or an existing part) contains the following errors.
+
+Try fixing the errors and re-running the build.
+
+[SEVERE] hive_generator on lib/features/game/presentation/controllers/game_controller.dart (cached):
+
+This builder requires Dart inputs without syntax errors.
+However, package:sun_moon_puzzle/features/game/presentation/controllers/game_controller.dart (or an existing part) contains the following errors.
+
+Try fixing the errors and re-running the build.
+
+[SEVERE] Failed after 268ms
