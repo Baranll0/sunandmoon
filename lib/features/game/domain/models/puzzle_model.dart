@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'cell_model.dart';
 import 'level_model.dart';
+import '../../../../core/domain/mechanic_flag.dart';
 
 part 'puzzle_model.freezed.dart';
 part 'puzzle_model.g.dart';
@@ -35,6 +36,12 @@ class PuzzleModel with _$PuzzleModel {
     
     /// Date this puzzle was created (for daily challenges)
     DateTime? createdAt,
+    
+    /// Mechanics applied to this level
+    @Default([]) List<MechanicFlag> mechanics,
+    
+    /// Parameters for mechanics (e.g., maxMoves, maxMistakes)
+    @Default({}) Map<String, dynamic> params,
   }) = _PuzzleModel;
 
   factory PuzzleModel.fromJson(Map<String, dynamic> json) =>

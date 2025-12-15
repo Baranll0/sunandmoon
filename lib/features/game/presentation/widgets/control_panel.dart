@@ -5,6 +5,7 @@ import '../../../../core/services/hint_service.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../settings/screens/settings_screen.dart';
 import '../controllers/game_controller.dart';
+import 'help_overlay.dart';
 
 /// Control Panel - Bottom bar with game controls
 class ControlPanel extends ConsumerWidget {
@@ -87,12 +88,12 @@ class ControlPanel extends ConsumerWidget {
                 _HintButton(
                   onPressed: () => gameNotifier.showHint(context),
                 ),
-                // Menu Button
+                // Help Button
                 _ControlButton(
-                  icon: Icons.menu,
-                  label: strings.menu,
+                  icon: Icons.help_outline,
+                  label: strings.help,
                   onPressed: () {
-                    _showMenuDialog(context, ref);
+                      _showHelpOverlay(context);
                   },
                   isActive: false,
                 ),
@@ -104,80 +105,60 @@ class ControlPanel extends ConsumerWidget {
     );
   }
 
-  void _showMenuDialog(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
+  void _showHelpOverlay(BuildContext context) {
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.settings, color: AppTheme.inkDark),
-                title: const Text('Settings'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.home, color: AppTheme.inkDark),
-                title: const Text('Home'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        ),
+      barrierColor: Colors.transparent, // Helper handles dimming
+      builder: (context) => HelpOverlay(
+        onClose: () => Navigator.of(context).pop(),
       ),
     );
   }
 
-  void _showPencilModeExplanation(BuildContext context) {
+  // Deprecated menu dialog - replaced by HelpOverlay
+  /*
+  void _showMenuDialog(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      ...
+    );
+  }
+  */
+
+  void _showPencilModeExplanation(BuildContext context, WidgetRef ref) {
+    final strings = ref.read(appStringsProvider);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Pencil Mode'),
-        content: const Column(
+        title: Text(strings.pencilMode),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Pencil Mode allows you to mark possible values in empty cells without committing to them.',
-              style: TextStyle(fontSize: 16),
+              strings.pencilModeDescription,
+              style: const TextStyle(fontSize: 16),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
-              'How to use:',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              strings.howToUse,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            SizedBox(height: 8),
-            Text('1. Tap the Pencil button to activate Pencil Mode'),
-            Text('2. Tap an empty cell to add/remove pencil marks'),
-            Text('3. Pencil marks help you track possible values'),
-            Text('4. Tap the Pencil button again to deactivate'),
-            SizedBox(height: 16),
+            const SizedBox(height: 8),
+            Text(strings.pencilModeTip1),
+            Text(strings.pencilModeTip2),
+            Text(strings.pencilModeTip3),
+            Text(strings.pencilModeTip4),
+            const SizedBox(height: 16),
             Text(
-              'Tip: Use pencil marks to work through logic without making permanent moves.',
-              style: TextStyle(fontStyle: FontStyle.italic),
+              strings.pencilModeTip,
+              style: const TextStyle(fontStyle: FontStyle.italic),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Got it'),
+            child: Text(strings.gotIt),
           ),
         ],
       ),

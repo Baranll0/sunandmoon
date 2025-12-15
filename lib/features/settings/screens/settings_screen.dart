@@ -5,7 +5,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/haptic_service.dart';
 import '../../../../core/services/sound_service.dart';
 import '../../../../core/localization/locale_provider.dart';
-
+import '../../../../core/services/sync_provider.dart';
+import '../../../../core/services/sync_manager.dart';
 /// Settings Screen
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -46,7 +47,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('haptics_enabled', value);
+    await prefs.setBool('haptics_enabled', value);
     HapticService.setEnabled(value);
+    
+    // Trigger sync
+    ref.read(syncManagerProvider)?.markDirty(StateType.settings);
     
     // Test haptic if enabling
     if (value) {
@@ -60,7 +65,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('sounds_enabled', value);
+    await prefs.setBool('sounds_enabled', value);
     SoundService.setEnabled(value);
+
+    // Trigger sync
+    ref.read(syncManagerProvider)?.markDirty(StateType.settings);
     
     // Test sound if enabling
     if (value) {
@@ -74,6 +83,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_check_enabled', value);
+    
+    // Trigger sync
+    ref.read(syncManagerProvider)?.markDirty(StateType.settings);
   }
 
   @override
@@ -102,7 +114,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: ListTile(
               leading: Icon(Icons.language, color: AppTheme.sunOrange),
               title: Text(strings.language),
-              subtitle: Text(currentLocale == 'en' ? strings.english : strings.turkish),
+              subtitle: Text(
+                currentLocale == 'en' ? strings.english :
+                currentLocale == 'tr' ? strings.turkish :
+                currentLocale == 'de' ? strings.german :
+                strings.french,
+              ),
               trailing: DropdownButton<String>(
                 value: currentLocale,
                 items: [
@@ -114,11 +131,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     value: 'tr',
                     child: Text(strings.turkish),
                   ),
+                  DropdownMenuItem(
+                    value: 'de',
+                    child: Text(strings.german),
+                  ),
+                  DropdownMenuItem(
+                    value: 'fr',
+                    child: Text(strings.french),
+                  ),
                 ],
                 onChanged: (String? newLocale) {
-                  if (newLocale != null) {
-                    localeNotifier.setLocale(newLocale);
-                  }
+                    if (newLocale != null) {
+                      localeNotifier.setLocale(newLocale);
+                      // Trigger sync
+                      ref.read(syncManagerProvider)?.markDirty(StateType.settings);
+                    }
                 },
               ),
             ),

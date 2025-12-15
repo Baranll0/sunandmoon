@@ -33,6 +33,9 @@ class GameStatus with _$GameStatus {
     
     /// Number of hints used
     @Default(0) int hintsUsed,
+    
+    /// Number of mistakes made (invalid placements)
+    @Default(0) int mistakeCount,
   }) = _GameStatus;
 
   factory GameStatus.fromJson(Map<String, dynamic> json) =>

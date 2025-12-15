@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/locale_provider.dart';
+import '../../../../core/domain/mechanic_flag.dart';
 import '../../domain/models/game_status.dart';
 import '../controllers/game_controller.dart';
 
@@ -14,7 +15,15 @@ class GameTopBar extends ConsumerWidget {
     // Watch the notifier provider directly to get the status
     final gameState = ref.watch(gameStateNotifierProvider);
     final status = gameState.status;
+    final puzzle = gameState.puzzle;
     final gameNotifier = ref.read(gameStateNotifierProvider.notifier);
+    final strings = ref.watch(appStringsProvider);
+
+    // Check for mechanics
+    final hasMoveLimit = puzzle?.mechanics.contains(MechanicFlag.moveLimit) ?? false;
+    final hasMistakeLimit = puzzle?.mechanics.contains(MechanicFlag.mistakeLimit) ?? false;
+    final maxMoves = hasMoveLimit ? (puzzle?.params['maxMoves'] as int? ?? 50) : null;
+    final maxMistakes = hasMistakeLimit ? (puzzle?.params['maxMistakes'] as int? ?? 5) : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -33,19 +42,50 @@ class GameTopBar extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Timer (if active)
+            // Left side: Timer (if active)
             if (status.mode == GameMode.speedRun || status.mode == GameMode.daily)
               _StatItem(
                 icon: Icons.timer,
                 value: _formatTime(status.elapsedSeconds),
-                label: 'Time',
+                label: strings.time,
               ),
-            // Steps Count (reframed from Moves)
-            _StatItem(
-              icon: Icons.touch_app,
-              value: '${status.moveCount}',
-              label: ref.watch(appStringsProvider).stepsLabel,
-            ),
+            // Center: Mechanics HUD (moveLimit, mistakeLimit)
+            if (hasMoveLimit || hasMistakeLimit)
+              Row(
+                children: [
+                  if (hasMoveLimit) ...[
+                    _MechanicStatItem(
+                      icon: Icons.touch_app,
+                      value: '${status.moveCount}',
+                      max: maxMoves!,
+                      label: strings.stepsLabel,
+                      color: status.moveCount >= maxMoves * 0.8 
+                          ? AppTheme.errorRed 
+                          : AppTheme.inkDark,
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                  if (hasMistakeLimit) ...[
+                    _MechanicStatItem(
+                      icon: Icons.error_outline,
+                      value: '${status.mistakeCount}',
+                      max: maxMistakes!,
+                      label: strings.mistakes,
+                      color: status.mistakeCount >= maxMistakes * 0.8 
+                          ? AppTheme.errorRed 
+                          : AppTheme.inkDark,
+                    ),
+                    const SizedBox(width: 16),
+                  ],
+                ],
+              ),
+            // Right side: Steps Count (if no mechanics) or Pause button
+            if (!hasMoveLimit && !hasMistakeLimit)
+              _StatItem(
+                icon: Icons.touch_app,
+                value: '${status.moveCount}',
+                label: strings.stepsLabel,
+              ),
             // Pause/Resume Button
             if (status.mode == GameMode.speedRun || status.mode == GameMode.daily)
               IconButton(
@@ -54,7 +94,7 @@ class GameTopBar extends ConsumerWidget {
                   color: AppTheme.inkDark,
                 ),
                 onPressed: () => gameNotifier.togglePause(),
-                tooltip: status.isPaused ? 'Resume' : 'Pause',
+                tooltip: status.isPaused ? strings.resume : strings.pause,
               ),
           ],
         ),
@@ -103,6 +143,54 @@ class _StatItem extends StatelessWidget {
               label,
               style: const TextStyle(
                 fontSize: 10,
+                color: AppTheme.inkLight,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Mechanic stat item with max value (e.g., "5/10 moves")
+class _MechanicStatItem extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final int max;
+  final String label;
+  final Color color;
+
+  const _MechanicStatItem({
+    required this.icon,
+    required this.value,
+    required this.max,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$value/$max',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
                 color: AppTheme.inkLight,
               ),
             ),

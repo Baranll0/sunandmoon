@@ -14,33 +14,28 @@ class LevelManager {
     return levelId;
   }
 
-  /// Get grid size based on LEVEL ID (CRITICAL FIX)
-  /// - Levels 1-15 (Chapter 1): MUST be 4x4
-  /// - Levels 16+ (Chapter 2+): MUST be 6x6 (Chapter 2 artık 6x6!)
-  /// - Levels 101+: MUST be 8x8
-  /// NEVER generate 10x10 or 12x12 grids
+  /// Get grid size based on LEVEL ID (NEW STRUCTURE: Master Spec)
+  /// - Levels 1-10 (Chapter 1): 4x4
+  /// - Levels 11+ (Chapter 2+): 6x6
+  /// Note: 8x8 reserved for future expansion or special modes
   static int getGridSizeForLevelId(int levelId) {
-    if (levelId <= 15) {
-      return 4; // Levels 1-15 (Chapter 1): 4x4
-    } else if (levelId <= 100) {
-      return 6; // Levels 16-100 (Chapter 2+): 6x6
+    if (levelId <= 10) {
+      return 4; // Levels 1-10 (Chapter 1): 4x4
     } else {
-      return 8; // Levels 101+: 8x8 (NEVER go above 8x8)
+      return 6; // Levels 11+ (Chapter 2-5+): 6x6
     }
   }
 
   /// Get grid size for a specific chapter and level
   /// Uses level ID to determine grid size
-  /// Strict Rules: 1-20=4x4, 21-100=6x6, 101+=8x8
   static int getGridSizeForChapter(int chapter, int level) {
     final levelId = getLevelId(chapter, level);
     return getGridSizeForLevelId(levelId);
   }
 
   /// Get grid size directly from level ID
-  /// Strict formula: levelId <= 20 ? 4 : (levelId <= 100 ? 6 : 8)
   static int getGridSize(int levelId) {
-    return levelId <= 20 ? 4 : (levelId <= 100 ? 6 : 8);
+    return levelId <= 10 ? 4 : 6;
   }
 
   /// DEPRECATED: Use getGridSizeForChapter(chapter, level) instead
@@ -50,36 +45,44 @@ class LevelManager {
     return getGridSizeForChapter(chapter, 1);
   }
 
-  /// Get number of levels per chapter
+  /// Get number of levels per chapter (NEW STRUCTURE: Master Spec)
+  /// - Chapter 1: 10 levels
+  /// - Chapter 2-5: 20 levels each
+  /// - Chapter 6+: 20 levels (procedural)
   static int getLevelsPerChapter(int chapter) {
-    if (chapter <= 2) {
-      return 15; // Chapters 1-2: 15 levels
-    } else if (chapter <= 12) {
-      return 20; // Chapters 3-12: 20 levels
+    if (chapter == 1) {
+      return 10;
     } else {
-      return 20; // Chapter 13+: 20 levels
+      return 20; // Chapter 2+: 20 levels each
     }
   }
 
   /// Calculate difficulty factor based on level ID
-  /// Difficulty Factor = percentage of cells to KEEP (lower = harder)
+  /// Difficulty Factor = percentage of cells to REMOVE (higher = harder)
   /// 
-  /// NEW Density-Based Masking System:
-  /// - Levels 1-5 (Tutorial): Keep 60% filled (40% empty)
-  /// - Levels 6-15 (Easy): Keep 45% filled (55% empty) - CRITICAL: Level 13 must be ~7-8 cells
-  /// - Levels 16-30 (Medium): Keep 35% filled (65% empty)
-  /// - Levels 31+ (Hard): Keep 30% filled (70% empty)
+  /// REVISED Density-Based Masking System (Master Spec):
+  /// - Level 1 (First Puzzle): Remove 50% (Keep 50% filled)
+  /// - Levels 2-3 (Tutorial): Remove 45% (Keep 55% filled)
+  /// - Levels 4-10 (Chapter 1): Remove 50% (Keep 50% filled)
+  /// - Levels 11-30 (Chapter 2): Remove 55% (Keep 45% filled)
+  /// - Levels 31-50 (Chapter 3): Remove 60% (Keep 40% filled)
+  /// - Levels 51-70 (Chapter 4): Remove 65% (Keep 35% filled)
+  /// - Levels 71+ (Chapter 5+): Remove 70% (Keep 30% filled)
   static double calculateDifficultyFactor(int chapter, int level) {
     final levelId = getLevelId(chapter, level);
     
-    if (levelId <= 5) {
-      return 0.40; // Tutorial: Keep 60% filled (remove 40%)
-    } else if (levelId <= 15) {
-      return 0.55; // Easy: Keep 45% filled (remove 55%) - Level 13: 16 * 0.45 = ~7 cells
+    if (levelId <= 3) {
+      return 0.55; // Levels 1-3: Remove 55% (Keep 45% -> ~7/16) - Satisfies Min 2 Empty
+    } else if (levelId <= 10) {
+      return 0.60; // Chapter 1: Remove 60% (Keep 40% -> ~6/16)
     } else if (levelId <= 30) {
-      return 0.65; // Medium: Keep 35% filled (remove 65%)
+      return 0.55; // Chapter 2: Medium
+    } else if (levelId <= 50) {
+      return 0.60; // Chapter 3: Harder
+    } else if (levelId <= 70) {
+      return 0.65; // Chapter 4: Very Hard
     } else {
-      return 0.70; // Hard: Keep 30% filled (remove 70%)
+      return 0.70; // Chapter 5+: Expert
     }
   }
 
@@ -107,6 +110,22 @@ class LevelManager {
     } else {
       // First level of next chapter
       return LevelModel(chapter: current.chapter + 1, level: 1);
+    }
+  }
+
+  /// Get previous level (for completion animation)
+  static LevelModel? getPreviousLevel(LevelModel current) {
+    if (current.level > 1) {
+      // Previous level in same chapter
+      return LevelModel(chapter: current.chapter, level: current.level - 1);
+    } else if (current.chapter > 1) {
+      // Last level of previous chapter
+      final prevChapter = current.chapter - 1;
+      final maxLevel = getLevelsPerChapter(prevChapter);
+      return LevelModel(chapter: prevChapter, level: maxLevel);
+    } else {
+      // Already at first level
+      return null;
     }
   }
 

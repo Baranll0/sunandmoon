@@ -86,6 +86,9 @@ class _CellWidgetState extends State<CellWidget>
             // Highlight overlay
             if (widget.cell.isHighlighted)
               _buildHighlightOverlay(),
+            // Lock icon overlay (lockedCells mechanic)
+            if (widget.cell.isLocked)
+              _buildLockOverlay(),
           ],
         ),
       ),
@@ -196,6 +199,25 @@ class _CellWidgetState extends State<CellWidget>
         border: Border.all(
           color: AppTheme.hintYellow,
           width: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockOverlay() {
+    return Positioned(
+      top: 4,
+      right: 4,
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: AppTheme.inkDark.withOpacity(0.8),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.lock,
+          size: widget.size * 0.15,
+          color: Colors.white,
         ),
       ),
     );

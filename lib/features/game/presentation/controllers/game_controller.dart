@@ -15,6 +15,10 @@ import '../../../../core/services/progress_service.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../../core/domain/hint_result.dart';
+import '../../../../core/domain/mechanic_flag.dart';
+import '../../../../core/repositories/game_state_repository.dart';
+import '../../../../core/providers/sync_providers.dart';
+import '../../../../core/services/sync_manager.dart';
 import '../../data/repositories/game_repository.dart';
 import '../utils/game_utils.dart';
 
@@ -32,9 +36,15 @@ GameRepository gameRepository(GameRepositoryRef ref) {
 class GameStateNotifier extends _$GameStateNotifier {
   Timer? _timer;
   bool _timerActive = false;
+  GameStateRepository? _gameStateRepo;
 
   @override
   GameState build() {
+    // Get game state repository (async, will be set when ready)
+    ref.read(gameStateRepositoryProvider.future).then((repo) {
+      _gameStateRepo = repo;
+    });
+    
     // Cleanup timer when provider is disposed
     ref.onDispose(() {
       _timer?.cancel();
@@ -56,8 +66,8 @@ class GameStateNotifier extends _$GameStateNotifier {
       await ProgressService.saveProgress(level);
       await ProgressService.saveMaxUnlockedLevel(level);
       
-      // Generate new puzzle for level
-      final puzzle = repository.generatePuzzleForLevel(level);
+      // Generate new puzzle for level (now async, loads from LevelLoader)
+      final puzzle = await repository.generatePuzzleForLevel(level);
       
       // Load auto-check setting from preferences
       final autoCheckEnabled = await SettingsService.getAutoCheckEnabled();
@@ -73,6 +83,7 @@ class GameStateNotifier extends _$GameStateNotifier {
           elapsedSeconds: 0,
           moveCount: 0,
           hintsUsed: 0,
+          mistakeCount: 0,
           autoCheck: autoCheckEnabled, // Load from settings
         ),
         undoStack: [],
@@ -174,17 +185,28 @@ class GameStateNotifier extends _$GameStateNotifier {
   }
 
   /// Handles cell tap
-  void onCellTap(int row, int col, {int? value}) {
+  void onCellTap(int row, int col, {int? value, BuildContext? context}) {
     if (state.puzzle == null) return;
     if (state.status.isCompleted || state.status.isPaused) return;
 
     final puzzle = state.puzzle!;
     
-    // Don't allow editing given cells
-    if (puzzle.currentState[row][col].isGiven) {
+    // Don't allow editing given cells or locked cells
+    final cell = puzzle.currentState[row][col];
+    if (cell.isGiven || cell.isLocked) {
       HapticService.heavyImpact();
       SoundService.playError();
       return;
+    }
+
+    // MECHANICS ENFORCEMENT: Check moveLimit
+    if (puzzle.mechanics.contains(MechanicFlag.moveLimit)) {
+      final maxMoves = puzzle.params['maxMoves'] as int? ?? 50;
+      if (state.status.moveCount >= maxMoves) {
+        // Out of moves - show dialog
+        _showOutOfMovesDialog(context);
+        return;
+      }
     }
 
     // Get the value to place
@@ -234,6 +256,24 @@ class GameStateNotifier extends _$GameStateNotifier {
     if (hasError) {
       HapticService.heavyImpact();
       SoundService.playError();
+      
+      // MECHANICS ENFORCEMENT: Increment mistake count
+      final newMistakeCount = state.status.mistakeCount + 1;
+      
+      // Check mistakeLimit
+      if (puzzle.mechanics.contains(MechanicFlag.mistakeLimit)) {
+        final maxMistakes = puzzle.params['maxMistakes'] as int? ?? 5;
+        if (newMistakeCount >= maxMistakes) {
+          // Out of mistakes - fail level
+          _failLevel(context, reason: 'mistakeLimit');
+          return;
+        }
+      }
+      
+      // Update mistake count
+      state = state.copyWith(
+        status: state.status.copyWith(mistakeCount: newMistakeCount),
+      );
     } else {
       HapticService.lightImpact();
       SoundService.playTap();
@@ -253,6 +293,20 @@ class GameStateNotifier extends _$GameStateNotifier {
       ),
       redoStack: [], // Clear redo stack on new move
     );
+
+    // MECHANICS ENFORCEMENT: Check moveLimit after incrementing
+    if (updatedPuzzle.mechanics.contains(MechanicFlag.moveLimit)) {
+      final maxMoves = updatedPuzzle.params['maxMoves'] as int? ?? 50;
+      if (state.status.moveCount >= maxMoves) {
+        // Out of moves - show dialog
+        _showOutOfMovesDialog(context);
+        // Don't allow further moves
+        state = state.copyWith(
+          status: state.status.copyWith(isPaused: true),
+        );
+        return;
+      }
+    }
 
     // CRITICAL: Always check if puzzle is completed (regardless of auto-check)
     _checkCompletion(); // Fire and forget - async operation
@@ -603,8 +657,32 @@ class GameStateNotifier extends _$GameStateNotifier {
       
       // If this is a level-based puzzle, mark it as completed and advance
       if (state.puzzle!.level != null) {
-        final nextLevel = await ProgressService.completeLevel(state.puzzle!.level!);
-        // Update max unlocked level
+        final level = state.puzzle!.level!;
+        
+        // Update progress via repository
+        if (_gameStateRepo != null) {
+          // Get existing progress to calculate totalSolved correctly
+          final existingProgress = _gameStateRepo!.getCurrentProgress();
+          final currentTotalSolved = existingProgress?.stats.totalSolved ?? 0;
+          
+          await _gameStateRepo!.updateProgress(
+            level: level,
+            totalSolved: 1, // Pass 1 to increment the count
+            totalHintsUsed: state.status.hintsUsed,
+            totalPlaySeconds: state.status.elapsedSeconds,
+            totalMoves: state.status.moveCount,
+          );
+          
+          // Clear current run
+          final syncManager = await ref.read(syncManagerProvider.future);
+          final uid = syncManager.authService.currentUserId;
+          if (uid != null) {
+            await _gameStateRepo!.clearCurrentRun(uid);
+          }
+        }
+        
+        // Legacy progress service (keep for backward compatibility)
+        final nextLevel = await ProgressService.completeLevel(level);
         if (nextLevel != null) {
           await ProgressService.saveMaxUnlockedLevel(nextLevel);
         }
@@ -702,7 +780,122 @@ class GameStateNotifier extends _$GameStateNotifier {
   void clearGame() {
     _timer?.cancel();
     _timerActive = false;
+    
+    // Flush current run before clearing
+    _gameStateRepo?.flushNow();
+    
     state = const GameState();
+  }
+
+  /// Shows "Out of Moves" dialog when moveLimit is reached
+  Future<void> _showOutOfMovesDialog(BuildContext? context) async {
+    if (context == null || !context.mounted) return;
+    
+    final strings = ref.read(appStringsProvider);
+    final puzzle = state.puzzle!;
+    final maxMoves = puzzle.params['maxMoves'] as int? ?? 50;
+    
+    // Stop timer
+    _timer?.cancel();
+    _timerActive = false;
+    
+    // Pause game
+    state = state.copyWith(
+      status: state.status.copyWith(isPaused: true),
+    );
+    
+    // Show dialog
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(strings.outOfMoves),
+        content: Text(
+          strings.outOfMovesMessage.replaceAll('{maxMoves}', maxMoves.toString()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Retry level
+              if (state.puzzle?.level != null) {
+                startLevel(state.puzzle!.level!);
+              }
+            },
+            child: Text(strings.retry),
+          ),
+          // TODO: Add "Watch Ad for +X Moves" button (hook only, no ad logic)
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigate back to Journey Map
+              Navigator.of(context).pop();
+            },
+            child: Text(strings.backToMap),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fails the level (e.g., mistakeLimit exceeded)
+  Future<void> _failLevel(BuildContext? context, {required String reason}) async {
+    if (state.puzzle == null) return;
+    
+    // Stop timer
+    _timer?.cancel();
+    _timerActive = false;
+    
+    // Mark as failed
+    state = state.copyWith(
+      status: state.status.copyWith(
+        isCompleted: false,
+        isPlaying: false,
+        isPaused: true,
+      ),
+    );
+    
+    HapticService.heavyImpact();
+    SoundService.playError();
+    
+    if (context != null && context.mounted) {
+      final strings = ref.read(appStringsProvider);
+      final puzzle = state.puzzle!;
+      final maxMistakes = puzzle.params['maxMistakes'] as int? ?? 5;
+      
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text(strings.levelFailed),
+          content: Text(
+            reason == 'mistakeLimit'
+                ? strings.mistakeLimitExceeded.replaceAll('{maxMistakes}', maxMistakes.toString())
+                : strings.levelFailedMessage,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Retry level
+                if (state.puzzle?.level != null) {
+                  startLevel(state.puzzle!.level!);
+                }
+              },
+              child: Text(strings.retry),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate back to Journey Map
+                Navigator.of(context).pop();
+              },
+              child: Text(strings.backToMap),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
 }

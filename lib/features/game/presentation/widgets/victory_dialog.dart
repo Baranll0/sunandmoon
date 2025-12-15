@@ -6,18 +6,19 @@ import '../../domain/models/game_status.dart';
 import '../../domain/models/puzzle_model.dart';
 
 /// Victory Dialog - Shown when puzzle is completed
+/// New flow: Only "Next Level" button, no "Back to Map" or "Replay"
 class VictoryDialog extends ConsumerWidget {
   final GameStatus status;
   final PuzzleModel puzzle;
   final VoidCallback onNextLevel;
-  final VoidCallback onNewGame;
+  final VoidCallback? onClose; // Optional close button (X in corner)
 
   const VictoryDialog({
     super.key,
     required this.status,
     required this.puzzle,
     required this.onNextLevel,
-    required this.onNewGame,
+    this.onClose,
   });
 
   @override
@@ -38,106 +39,99 @@ class VictoryDialog extends ConsumerWidget {
             ),
           ],
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-            // Celebration Icon
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppTheme.sunOrange.withOpacity(0.1),
-                shape: BoxShape.circle,
+        child: Stack(
+          children: [
+            // Close button (X) in top-right corner
+            if (onClose != null)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: AppTheme.inkLight),
+                  onPressed: onClose,
+                  tooltip: strings.cancel,
+                ),
               ),
-              child: const Icon(
-                Icons.celebration,
-                size: 50,
-                color: AppTheme.sunOrange,
-              ),
-            ),
-            const SizedBox(height: 24),
-            // Title
-            Text(
-              strings.puzzleSolved,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.inkDark,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Statistics
-            _StatRow(
-              icon: Icons.timer,
-              label: strings.time,
-              value: _formatTime(status.elapsedSeconds),
-              color: AppTheme.moonBlue,
-            ),
-            const SizedBox(height: 12),
-            _StatRow(
-              icon: Icons.touch_app,
-              label: strings.stepsLabel,
-              value: '${status.moveCount}',
-              color: AppTheme.sunOrange,
-            ),
-            if (status.hintsUsed > 0) ...[
-              const SizedBox(height: 12),
-              _StatRow(
-                icon: Icons.lightbulb_outline,
-                label: strings.hints,
-                value: '${status.hintsUsed}',
-                color: AppTheme.hintYellow,
-              ),
-            ],
-            const SizedBox(height: 24),
-            // Buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onNewGame,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      side: const BorderSide(color: AppTheme.inkLight, width: 1.5),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+            SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Celebration Icon
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: AppTheme.sunOrange.withOpacity(0.1),
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      strings.newGame,
-                      style: const TextStyle(
-                        color: AppTheme.inkDark,
-                        fontWeight: FontWeight.w600,
+                    child: const Icon(
+                      Icons.celebration,
+                      size: 50,
+                      color: AppTheme.sunOrange,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Title
+                  Text(
+                    strings.puzzleSolved,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.inkDark,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Statistics
+                  _StatRow(
+                    icon: Icons.timer,
+                    label: strings.time,
+                    value: _formatTime(status.elapsedSeconds),
+                    color: AppTheme.moonBlue,
+                  ),
+                  const SizedBox(height: 12),
+                  _StatRow(
+                    icon: Icons.touch_app,
+                    label: strings.stepsLabel,
+                    value: '${status.moveCount}',
+                    color: AppTheme.sunOrange,
+                  ),
+                  if (status.hintsUsed > 0) ...[
+                    const SizedBox(height: 12),
+                    _StatRow(
+                      icon: Icons.lightbulb_outline,
+                      label: strings.hints,
+                      value: '${status.hintsUsed}',
+                      color: AppTheme.hintYellow,
+                    ),
+                  ],
+                  const SizedBox(height: 32),
+                  // Primary Button: Next Level only
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: onNextLevel,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.sunOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: Text(
+                        strings.nextLevel,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onNextLevel,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.sunOrange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: Text(
-                      strings.nextLevel,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-            ],
-          ),
+          ],
         ),
       ),
     );

@@ -38,13 +38,24 @@ class DifficultyMetrics {
     }
     
     // Penalize high forcedMoveRatio (too easy)
-    // If 90%+ is forced, reduce score significantly
-    if (forcedMoveRatio > 0.9) {
-      score *= 0.3; // Very easy puzzle
-    } else if (forcedMoveRatio > 0.7) {
-      score *= 0.6; // Easy puzzle
-    } else if (forcedMoveRatio > 0.5) {
-      score *= 0.8; // Medium puzzle
+    // 4x4 grids naturally have high forced move ratios even for hard puzzles
+    // so we relax the penalties for them
+    if (gridSize == 4) {
+      if (forcedMoveRatio > 0.95) { // Only penalize if almost EVERYTHING is forced
+        score *= 0.5;
+      } else if (forcedMoveRatio > 0.85) {
+        score *= 0.8;
+      }
+      // No penalty for 0.7-0.85 range for 4x4
+    } else {
+      // Standard penalties for larger grids
+      if (forcedMoveRatio > 0.9) {
+        score *= 0.3; // Very easy puzzle
+      } else if (forcedMoveRatio > 0.7) {
+        score *= 0.6; // Easy puzzle
+      } else if (forcedMoveRatio > 0.5) {
+        score *= 0.8; // Medium puzzle
+      }
     }
     
     // Normalize based on grid size
@@ -54,7 +65,7 @@ class DifficultyMetrics {
     double normalizationFactor;
     switch (gridSize) {
       case 4:
-        normalizationFactor = 10.0 / 15.0;
+        normalizationFactor = 10.0 / 10.0; // Adjusted: 4x4 rarely gets >10 raw score
         break;
       case 6:
         normalizationFactor = 10.0 / 25.0;

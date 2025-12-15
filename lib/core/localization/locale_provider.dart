@@ -5,7 +5,7 @@ import 'app_strings.dart';
 part 'locale_provider.g.dart';
 
 /// Locale provider - manages app language
-/// Defaults to English ('en'), supports Turkish ('tr')
+/// Defaults to English ('en'), supports Turkish ('tr'), German ('de'), French ('fr')
 @Riverpod(keepAlive: true)
 class LocaleNotifier extends _$LocaleNotifier {
   static const String _keyLocale = 'app_locale';
@@ -32,7 +32,7 @@ class LocaleNotifier extends _$LocaleNotifier {
   /// Set locale and save to SharedPreferences
   Future<void> setLocale(String locale) async {
     // Validate locale
-    if (locale != 'en' && locale != 'tr') {
+    if (locale != 'en' && locale != 'tr' && locale != 'de' && locale != 'fr') {
       locale = 'en'; // Default to English if invalid
     }
 

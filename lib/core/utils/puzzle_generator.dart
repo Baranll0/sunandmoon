@@ -1,18 +1,21 @@
 import 'dart:math';
-import 'package:flutter/foundation.dart';
 import '../constants/game_constants.dart';
 import 'grid_validator.dart';
 import 'grid_helper.dart';
 import 'puzzle_solver.dart';
+import 'region_layout_helper.dart';
 
 /// Puzzle Generator - Two-phase system: Generation (Backtracking) + Masking (Difficulty)
 /// Production-grade implementation for "Soluna" logic puzzle game
 class PuzzleGenerator {
   final Random _random;
+  final bool useRegions;
   int _maxRecursiveDepth = 0;
   static const int _maxDepthForWeb = 150000;
+  // Constant for pure Dart context
+  static const bool _isWeb = false; 
 
-  PuzzleGenerator({int? seed}) : _random = Random(seed ?? DateTime.now().millisecondsSinceEpoch);
+  PuzzleGenerator({int? seed, this.useRegions = false}) : _random = Random((seed ?? DateTime.now().millisecondsSinceEpoch) + 55555);
 
   /// PHASE A: Generate a complete valid board using recursive backtracking
   /// Returns a fully filled, valid grid that satisfies all Takuzu/Binairo rules
@@ -32,11 +35,10 @@ class PuzzleGenerator {
     );
 
     _maxRecursiveDepth = 0;
-    final int maxAttempts = kIsWeb ? 25 : 15;
+    final int maxAttempts = _isWeb ? 25 : 15;
     int attempts = 0;
 
     while (attempts < maxAttempts) {
-      // Reset grid
       if (attempts > 0) {
         for (int i = 0; i < size; i++) {
           for (int j = 0; j < size; j++) {
@@ -88,7 +90,11 @@ class PuzzleGenerator {
     final int cellsToKeep = (totalCells * keepRate).round();
     
     // Ensure minimum cells remain for solvability
-    final int minCells = (size * 0.25).round(); // At least 25% must remain
+    // CRITICAL: For 4x4 grids, we can be more aggressive (minimum 4 cells = 25%)
+    // For larger grids, keep at least 20% for better difficulty
+    final int minCells = size == 4 
+        ? 4  // 4x4: Minimum 4 cells (25%) - allows up to 75% removal
+        : (size * size * 0.20).round(); // 6x6, 8x8: Minimum 20%
     final int actualCellsToKeep = cellsToKeep.clamp(minCells, totalCells);
     final int targetCellsToRemove = totalCells - actualCellsToKeep;
 
@@ -102,7 +108,11 @@ class PuzzleGenerator {
 
     int removed = 0;
     int attempts = 0;
-    final int maxAttempts = totalCells * 5; // More attempts for better reduction
+    // CRITICAL: Increase attempts for better reduction, especially for smaller grids
+    // 4x4 grids need more attempts to reach target difficulty
+    final int maxAttempts = size == 4 
+        ? totalCells * 10  // 4x4: More attempts (160 attempts)
+        : totalCells * 5;  // 6x6, 8x8: Standard attempts
 
     // Try to remove cells while maintaining solvability and uniqueness
     for (int pos in positions) {
@@ -140,34 +150,149 @@ class PuzzleGenerator {
     // If we couldn't remove enough cells, try additional passes
     // but still maintain logic solvability and uniqueness
     if (removed < targetCellsToRemove && removed < totalCells - minCells) {
-      final remainingPositions = List.generate(totalCells, (i) => i)
-        ..shuffle(_random);
-      
-      for (int pos in remainingPositions) {
+      // CRITICAL: Try multiple additional passes with different shuffles
+      for (int pass = 0; pass < 3; pass++) {
         if (removed >= targetCellsToRemove) break;
-        if (attempts >= maxAttempts * 2) break;
+        if (attempts >= maxAttempts * 3) break; // Increased limit
         
-        attempts++;
-        final int row = pos ~/ size;
-        final int col = pos % size;
+        final remainingPositions = List.generate(totalCells, (i) => i)
+          ..shuffle(_random);
         
-        if (puzzle[row][col] == GameConstants.cellEmpty) continue;
+        for (int pos in remainingPositions) {
+          if (removed >= targetCellsToRemove) break;
+          if (attempts >= maxAttempts * 3) break;
+          
+          attempts++;
+          final int row = pos ~/ size;
+          final int col = pos % size;
+          
+          if (puzzle[row][col] == GameConstants.cellEmpty) continue;
+          
+          final int originalValue = puzzle[row][col];
+          puzzle[row][col] = GameConstants.cellEmpty;
+          
+          final canSolveLogically = PuzzleSolver.canSolveLogically(puzzle, size);
+          final solutionCount = PuzzleSolver.countSolutions(puzzle, size);
+          
+          if (canSolveLogically && solutionCount == 1) {
+            removed++;
+          } else {
+            puzzle[row][col] = originalValue;
+          }
+        }
+      }
+    }
+    
+    // FINAL PASS: Strictly enforce Master Spec Anti-Determinism Rule
+    // Condition: Every row and column must have at least 2 empty cells.
+    // If not met, force remove more cells until satisfied.
+    if (!checkMinEmptyPerLine(puzzle, size, 2)) {
+      final candidates = <int>[];
+      
+      // Identify rows/cols violating the min-2-empty rule
+      for (int r = 0; r < size; r++) {
+        if (_countEmptyInRow(puzzle, r, size) < 2) {
+           for (int c = 0; c < size; c++) candidates.add(r * size + c);
+        }
+      }
+      for (int c = 0; c < size; c++) {
+        if (_countEmptyInCol(puzzle, c, size) < 2) {
+           for (int r = 0; r < size; r++) candidates.add(r * size + c);
+        }
+      }
+      
+      candidates.shuffle(_random);
+      
+      for (int pos in candidates) {
+        if (removed >= totalCells - minCells) break; // Cannot remove more
         
-        final int originalValue = puzzle[row][col];
-        puzzle[row][col] = GameConstants.cellEmpty;
+        final int r = pos ~/ size;
+        final int c = pos % size;
+        
+        if (puzzle[r][c] == GameConstants.cellEmpty) continue;
+        
+        final int original = puzzle[r][c];
+        puzzle[r][c] = GameConstants.cellEmpty;
         
         final canSolveLogically = PuzzleSolver.canSolveLogically(puzzle, size);
         final solutionCount = PuzzleSolver.countSolutions(puzzle, size);
         
         if (canSolveLogically && solutionCount == 1) {
           removed++;
+          // If satisfied, stop
+          if (checkMinEmptyPerLine(puzzle, size, 2)) break;
         } else {
-          puzzle[row][col] = originalValue;
+          puzzle[r][c] = original; // Restore
         }
       }
     }
     
+    // CRITICAL: Log warning if we couldn't reach target difficulty
+    if (removed < targetCellsToRemove * 0.8) {
+      print('[PuzzleGenerator] WARNING: Could only remove $removed/$targetCellsToRemove cells '
+          '(${((removed / totalCells) * 100).toStringAsFixed(1)}% removal, '
+          'target: ${(difficultyFactor * 100).toStringAsFixed(1)}%)');
+    }
+    
     return puzzle;
+  }
+
+  /// Check if the puzzle has any fully filled row or column
+  bool _hasFullLine(List<List<int>> puzzle, int size) {
+    // Check rows
+    for (int r = 0; r < size; r++) {
+      if (_countEmptyInRow(puzzle, r, size) == 0) return true;
+    }
+    // Check cols
+    for (int c = 0; c < size; c++) {
+      if (_countEmptyInCol(puzzle, c, size) == 0) return true;
+    }
+    return false;
+  }
+
+  /// CRITICAL HARD GATE: Check if every row and column has at least [minEmpty] empty cells
+  /// Prevents "3 filled + 1 empty" patterns that are instantly forced
+  bool checkMinEmptyPerLine(List<List<int>> puzzle, int size, int minEmpty) {
+    // Check rows
+    for (int r = 0; r < size; r++) {
+      if (_countEmptyInRow(puzzle, r, size) < minEmpty) return false;
+    }
+    // Check cols
+    for (int c = 0; c < size; c++) {
+      if (_countEmptyInCol(puzzle, c, size) < minEmpty) return false;
+    }
+    return true;
+  }
+
+  /// CRITICAL GATE FOR CHAPTER 1 (4x4):
+  /// Prevent "3 givens in a row/col" even if they are not consecutive
+  /// This ensures 4x4 puzzles aren't trivally solvable by just filling the last gap immediately
+  /// Returns true if valid (not too trivial), false if too trivial
+  bool checkChapter1AntiTrivial(List<List<int>> puzzle, int size) {
+    if (size != 4) return true; // Only applies to 4x4
+    
+    // For 4x4, we want at least 2 empty cells per line (which is covered by _checkMinEmptyPerLine)
+    // BUT we also want to avoid cases where givens are placed such that they practically solve the line
+    // actually _checkMinEmptyPerLine(minEmpty=2) effectively enforces "max 2 givens per line" for 4x4
+    // since 4 - 2 = 2. So strict enforcement of minEmpty=2 is sufficient for 4x4.
+    
+    return checkMinEmptyPerLine(puzzle, size, 2);
+  }
+
+  int _countEmptyInRow(List<List<int>> puzzle, int row, int size) {
+    int count = 0;
+    for (int c = 0; c < size; c++) {
+      if (puzzle[row][c] == GameConstants.cellEmpty) count++;
+    }
+    return count;
+  }
+
+  int _countEmptyInCol(List<List<int>> puzzle, int col, int size) {
+    int count = 0;
+    for (int r = 0; r < size; r++) {
+      if (puzzle[r][col] == GameConstants.cellEmpty) count++;
+    }
+    return count;
   }
 
   /// Generate puzzle for a specific level with difficulty factor
@@ -186,7 +311,7 @@ class PuzzleGenerator {
   /// Fills the grid cell by cell, validating constraints at each step
   bool _solveGridBacktracking(List<List<int>> grid, int row, int col, int size) {
     // Limit recursion depth for web
-    if (kIsWeb) {
+    if (_isWeb) {
       _maxRecursiveDepth++;
       final maxDepth = size <= 6 ? _maxDepthForWeb : (_maxDepthForWeb ~/ 2);
       if (_maxRecursiveDepth > maxDepth) {
@@ -348,7 +473,63 @@ class PuzzleGenerator {
         }
       }
     }
+    
+    // Constraint 4: Regions (if enabled)
+    if (useRegions) {
+      if (!_checkRegionConstraint(grid, row, col, size, value)) {
+        return false;
+      }
+    }
 
+    return true;
+  }
+  
+  /// Check if placing value validates region constraints
+  /// Rule: Each region must contain equal number of Suns and Moons
+  bool _checkRegionConstraint(List<List<int>> grid, int row, int col, int size, int value) {
+    // Get region ID
+    final regionId = RegionLayoutHelper.getRegionId(row, col, size);
+    if (regionId == null) return true;
+    
+    int sunCount = 0;
+    int moonCount = 0;
+    int regionSize = 0;
+    int emptyCount = 0;
+    
+    // Scan full grid to find cells in this region
+    // Optimized: We only need to check cells up to current (row, col) technically,
+    // but counting all helps tracking full region completion.
+    // However, during backtracking grid is only partially filled.
+    for (int r = 0; r < size; r++) {
+       for (int c = 0; c < size; c++) {
+          if (RegionLayoutHelper.getRegionId(r, c, size) == regionId) {
+             regionSize++;
+             if (r == row && c == col) {
+               // Current cell being placed
+               if (value == GameConstants.cellSun) sunCount++;
+               else moonCount++;
+             } else {
+               // Existing cell
+               if (grid[r][c] == GameConstants.cellSun) sunCount++;
+               else if (grid[r][c] == GameConstants.cellMoon) moonCount++;
+               else emptyCount++;
+             }
+          }
+       }
+    }
+    
+    final int maxPerType = regionSize ~/ 2;
+    
+    // Check if we exceeded limits
+    if (sunCount > maxPerType) return false;
+    if (moonCount > maxPerType) return false;
+    
+    // If region is full (no empty slots left to fill), check if balanced
+    // Note: 'emptyCount' includes future cells. During backtracking we only care if we broke the limit.
+    // If we haven't broken the limit, it's valid so far.
+    // The backtracking will eventually fill the region and if it can't balance it, it will backtrack.
+    // So simple limit check is sufficient.
+    
     return true;
   }
 

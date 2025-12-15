@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import '../../../../core/utils/puzzle_generator.dart';
 import '../../../../core/services/level_manager.dart';
+import '../../../../core/data/level_loader.dart';
+import '../../../../core/domain/mechanic_flag.dart';
 import '../../domain/models/puzzle_model.dart';
 import '../../domain/models/cell_model.dart';
 import '../../domain/models/level_model.dart';
@@ -12,22 +15,112 @@ class GameRepository {
       : _puzzleGenerator = puzzleGenerator ?? PuzzleGenerator();
 
   /// Generates a new puzzle for a specific level
-  /// Uses two-phase system: Generation (Backtracking) + Masking (Difficulty)
+  /// Tries to load from LevelLoader first, falls back to generation if not available
   /// CRITICAL: Grid size is determined by level ID, not chapter
-  PuzzleModel generatePuzzleForLevel(LevelModel level) {
-    // Get configuration from LevelManager
+  Future<PuzzleModel> generatePuzzleForLevel(LevelModel level) async {
+    // Try to load from LevelLoader first
+    try {
+      final loadedLevel = await LevelLoader.loadLevel(level.chapter, level.level, throwOnError: false);
+      if (loadedLevel != null) {
+        // CRITICAL FIX: Check if givens is the same as solution (all cells filled)
+        // If so, generate puzzle on-the-fly from solution
+        bool givensIsComplete = true;
+        for (int r = 0; r < loadedLevel.size; r++) {
+          for (int c = 0; c < loadedLevel.size; c++) {
+            if (loadedLevel.givens[r][c] == 0) {
+              givensIsComplete = false;
+              break;
+            }
+          }
+          if (!givensIsComplete) break;
+        }
+        
+        // If givens is complete (same as solution), generate puzzle on-the-fly
+        List<List<int>> puzzleGivens;
+        if (givensIsComplete) {
+          debugPrint('[GameRepository] Level ${level.chapter}-${level.level}: givens is complete, generating puzzle from solution');
+          // Generate puzzle from solution using PuzzleGenerator
+          final gridSize = loadedLevel.size;
+          final difficultyFactor = LevelManager.calculateDifficultyFactor(level.chapter, level.level);
+          final generator = PuzzleGenerator(seed: loadedLevel.id);
+          puzzleGivens = generator.createPlayablePuzzle(loadedLevel.solution, difficultyFactor);
+        } else {
+          // Use givens as-is (already has empty cells)
+          puzzleGivens = loadedLevel.givens;
+        }
+        
+        // Convert LoadedLevel to PuzzleModel
+        final hasLockedCells = loadedLevel.mechanics.contains(MechanicFlag.lockedCells);
+        final lockedCount = hasLockedCells 
+            ? (loadedLevel.params['lockedCount'] as int? ?? 0)
+            : 0;
+        
+        // Mark some given cells as locked (if lockedCells mechanic active)
+        final List<List<CellModel>> currentState = puzzleGivens.asMap().entries.map((rowEntry) {
+          final int row = rowEntry.key;
+          return rowEntry.value.asMap().entries.map((colEntry) {
+            final int col = colEntry.key;
+            final int value = colEntry.value;
+            final isGiven = value != 0;
+            
+            // Mark as locked if: isGiven AND lockedCells mechanic active AND within lockedCount
+            // Simple strategy: lock first N given cells
+            bool isLocked = false;
+            if (hasLockedCells && isGiven && lockedCount > 0) {
+              // Count how many given cells we've seen so far
+              int givenCount = 0;
+              for (int r = 0; r <= row; r++) {
+                for (int c = 0; c < (r == row ? col + 1 : puzzleGivens[r].length); c++) {
+                  if (puzzleGivens[r][c] != 0) {
+                    givenCount++;
+                    if (r == row && c == col && givenCount <= lockedCount) {
+                      isLocked = true;
+                    }
+                  }
+                }
+              }
+            }
+            
+            return CellModel(
+              value: value,
+              isGiven: isGiven,
+              isLocked: isLocked,
+            );
+          }).toList();
+        }).toList();
+        
+        return PuzzleModel(
+          id: 'level_${level.chapter}_${level.level}_${loadedLevel.id}',
+          size: loadedLevel.size,
+          solution: loadedLevel.solution,
+          currentState: currentState,
+          difficulty: PuzzleDifficulty.easy, // Kept for backward compatibility
+          level: level,
+          seed: loadedLevel.id,
+          createdAt: DateTime.now(),
+          mechanics: loadedLevel.mechanics,
+          params: loadedLevel.params,
+        );
+      }
+    } catch (e) {
+      // Fall through to generation
+      debugPrint('[GameRepository] Failed to load level from pack: $e');
+    }
+    
+    // Fallback: Generate on-device (backward compatibility)
     final gridSize = LevelManager.getGridSizeForChapter(level.chapter, level.level);
     final difficultyFactor = LevelManager.calculateDifficultyFactor(level.chapter, level.level);
     final seed = LevelManager.generateSeed(level.chapter, level.level);
     
-    // Use new two-phase generation system
-    final generator = PuzzleGenerator(seed: seed);
+    // CRITICAL FIX: Run heavy generation in background isolate to prevent UI freeze
+    final result = await compute(_generatePuzzleInIsolate, {
+      'seed': seed,
+      'gridSize': gridSize,
+      'difficultyFactor': difficultyFactor,
+    });
     
-    // Phase A: Generate complete valid board
-    final List<List<int>> solution = generator.generateCompleteBoard(gridSize);
-    
-    // Phase B: Create playable puzzle by masking cells
-    final List<List<int>> puzzle = generator.createPlayablePuzzle(solution, difficultyFactor);
+    final solution = result['solution'] as List<List<int>>;
+    final puzzle = result['puzzle'] as List<List<int>>;
     
     // Convert to CellModel grid
     final List<List<CellModel>> currentState = puzzle.map((row) {
@@ -48,6 +141,8 @@ class GameRepository {
       level: level,
       seed: seed,
       createdAt: DateTime.now(),
+      mechanics: [], // No mechanics for generated puzzles
+      params: {},
     );
   }
 
@@ -133,5 +228,24 @@ class GameRepository {
         return 0.7; // 70% cells removed
     }
   }
+}
+
+/// Top-level function for compute() to generate puzzle in background
+Future<Map<String, dynamic>> _generatePuzzleInIsolate(Map<String, dynamic> params) async {
+  final int seed = params['seed'];
+  final int gridSize = params['gridSize'];
+  final double difficultyFactor = params['difficultyFactor'];
+  final generator = PuzzleGenerator(seed: seed);
+  
+  // Phase A: Generate complete valid board
+  final List<List<int>> solution = generator.generateCompleteBoard(gridSize);
+  
+  // Phase B: Create playable puzzle by masking cells
+  final List<List<int>> puzzle = generator.createPlayablePuzzle(solution, difficultyFactor);
+  
+  return {
+    'solution': solution,
+    'puzzle': puzzle,
+  };
 }
 

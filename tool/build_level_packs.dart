@@ -1,20 +1,21 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:sun_moon_puzzle/core/utils/level_generator.dart';
+import 'package:sun_moon_puzzle/core/services/level_manager.dart';
 
 /// Build-time tool to generate level packs for release
 /// 
 /// Usage:
-///   dart tool/build_level_packs.dart --chapters=1..15 --levelsPerChapter=20
+///   dart tool/build_level_packs.dart --chapters=1..5 --levelsPerChapter=20
 /// 
 /// Outputs:
-///   - assets/levels/chapter_01.json ... chapter_15.json
+///   - assets/levels/chapter_01.json ... chapter_05.json
 ///   - assets/levels/index.json (metadata)
 void main(List<String> args) async {
   // Parse arguments
   int startChapter = 1;
-  int endChapter = 15;
-  int levelsPerChapter = 20;
+  int endChapter = 5; // Chapters 1-5 (Master Spec)
+  int? levelsPerChapterOverride;
   
   for (final arg in args) {
     if (arg.startsWith('--chapters=')) {
@@ -27,13 +28,12 @@ void main(List<String> args) async {
         startChapter = endChapter = int.parse(range);
       }
     } else if (arg.startsWith('--levelsPerChapter=')) {
-      levelsPerChapter = int.parse(arg.substring('--levelsPerChapter='.length));
+      levelsPerChapterOverride = int.parse(arg.substring('--levelsPerChapter='.length));
     }
   }
   
-  print('=== Building Level Packs ===');
-  print('Chapters: $startChapter to $endChapter');
-  print('Levels per chapter: $levelsPerChapter\n');
+  print('=== Building Level Packs (Master Spec) ===');
+  print('Chapters: $startChapter to $endChapter\n');
   
   final generator = LevelGenerator(seed: 42);
   final indexData = <String, dynamic>{
@@ -47,7 +47,10 @@ void main(List<String> args) async {
   int totalFailed = 0;
   
   for (int chapter = startChapter; chapter <= endChapter; chapter++) {
-    print('Generating Chapter $chapter...');
+    // Get levels per chapter based on LevelManager
+    final levelsPerChapter = levelsPerChapterOverride ?? LevelManager.getLevelsPerChapter(chapter);
+    
+    print('Generating Chapter $chapter ($levelsPerChapter levels)...');
     final chapterLevels = <Map<String, dynamic>>[];
     int chapterGenerated = 0;
     int chapterFailed = 0;
@@ -56,19 +59,12 @@ void main(List<String> args) async {
       try {
         final generatedLevel = generator.generateLevel(chapter, level);
         
-        chapterLevels.add({
-          'id': generatedLevel.id,
-          'chapter': generatedLevel.chapter,
-          'level': generatedLevel.level,
-          'size': generatedLevel.size,
-          'givens': generatedLevel.givens,
-          'solution': generatedLevel.solution,
-          'difficultyScore': generatedLevel.difficultyScore,
-        });
+        chapterLevels.add(generatedLevel.toJson());
         
         chapterGenerated++;
-        if (level % 5 == 0) {
-          print('  Level $level/$levelsPerChapter (Score: ${generatedLevel.difficultyScore.toStringAsFixed(2)})');
+        if (level % 5 == 0 || level == 1) {
+          final mechanicsStr = generatedLevel.mechanics.map((m) => m.name).join(", ");
+          print('  Level $level/$levelsPerChapter (Score: ${generatedLevel.difficultyScore.toStringAsFixed(2)}, Mechanics: [$mechanicsStr])');
         }
       } catch (e) {
         chapterFailed++;
@@ -86,11 +82,15 @@ void main(List<String> args) async {
     });
     
     final chapterFile = File('assets/levels/chapter_${chapter.toString().padLeft(2, '0')}.json');
-    await chapterFile.create(recursive: true);
+    if (!await chapterFile.parent.exists()) {
+      await chapterFile.parent.create(recursive: true);
+    }
     await chapterFile.writeAsString(chapterJson);
     
     // Add to index
-    final gridSize = _getGridSizeForChapter(chapter);
+    // Use first level size as representative, or LevelManager
+    final gridSize = LevelManager.getGridSizeForChapter(chapter, 1);
+    
     indexData['chapters']!.add({
       'chapter': chapter,
       'gridSize': gridSize,
@@ -123,19 +123,14 @@ void main(List<String> args) async {
   print('Chapter files saved to: assets/levels/');
 }
 
-/// Get grid size for a chapter
-int _getGridSizeForChapter(int chapter) {
-  if (chapter <= 2) return 4;
-  if (chapter <= 12) return 6;
-  return 8;
-}
-
 /// Get difficulty label for a chapter
 String _getDifficultyLabel(int chapter) {
-  if (chapter == 1) return 'Beginner Logic';
-  if (chapter <= 3) return 'Intermediate Logic';
-  if (chapter <= 12) return 'Advanced Logic';
-  return 'Expert Logic';
+  if (chapter == 1) return 'Beginner (4x4)';
+  if (chapter == 2) return 'Intermediate (6x6)';
+  if (chapter == 3) return 'Advanced (6x6)';
+  if (chapter == 4) return 'Expert (6x6)';
+  if (chapter == 5) return 'Master (6x6)';
+  return 'Custom';
 }
 
 /// Get git commit hash if available
@@ -150,4 +145,3 @@ String _getGitCommitHash() {
   }
   return 'unknown';
 }
-

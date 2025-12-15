@@ -135,7 +135,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             Navigator.of(context).pop();
             final gameNotifier = ref.read(gameStateNotifierProvider.notifier);
             
-            // CRITICAL FIX: Use level-based progression, not difficulty-based
+            // New flow: Always go to Journey map, focus next node
             if (puzzle.level != null) {
               // Mark current level as completed
               await ProgressService.completeLevel(puzzle.level!);
@@ -144,33 +144,40 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               final nextLevel = LevelManager.getNextLevel(puzzle.level!);
               
               if (nextLevel != null) {
-                // Save progress first
-                await ProgressService.saveProgress(nextLevel);
-                // Start next level (will use correct grid size based on level ID)
-                await gameNotifier.startLevel(nextLevel);
-                _hasShownVictoryDialog = false;
-                // Reload game route immediately (state already updated)
-              } else {
-                // No more levels - go back to journey screen
-                if (context.mounted) {
-                  gameNotifier.clearGame();
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const JourneyScreen()),
-                    (route) => false,
-                  );
-                }
+                // Unlock next level
+                await ProgressService.saveMaxUnlockedLevel(nextLevel);
               }
+              
+              // Clear game and navigate to Journey
+              gameNotifier.clearGame();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => JourneyScreen(
+                      focusLevel: nextLevel, // Pass next level to focus
+                    ),
+                  ),
+                  (route) => false,
+                );
+              }
+              _hasShownVictoryDialog = false;
             } else {
               // Fallback for old puzzles without level info
-              final nextDifficulty = _getNextDifficulty(puzzle.difficulty);
-              gameNotifier.startNewGame(nextDifficulty);
+              gameNotifier.clearGame();
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const JourneyScreen(),
+                  ),
+                  (route) => false,
+                );
+              }
               _hasShownVictoryDialog = false;
             }
           },
-          onNewGame: () {
+          onClose: () {
+            // Optional: Close dialog without action (user can tap outside or X)
             Navigator.of(context).pop();
-            Navigator.of(context).pop(); // Go back to home
-            _hasShownVictoryDialog = false;
           },
         ),
       );
@@ -201,13 +208,18 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             color: AppTheme.inkLight,
           ),
           const SizedBox(height: 16),
+          Consumer(
+            builder: (context, ref, child) {
+              final strings = ref.watch(appStringsProvider);
+              return Column(
+                children: [
           Text(
-            'No puzzle loaded',
+                    strings.noPuzzleLoaded,
             style: Theme.of(context).textTheme.displayMedium,
           ),
           const SizedBox(height: 8),
           Text(
-            'Start a new game to begin',
+                    strings.startNewGame,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 24),
@@ -217,12 +229,16 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               Navigator.of(context).pop();
             },
             icon: const Icon(Icons.play_arrow),
-            label: const Text('New Game'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.sunOrange,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
+                    label: Text(strings.newGame),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.sunOrange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

@@ -5,7 +5,10 @@ import '../utils/grid_validator.dart';
 import '../utils/human_logic_solver.dart';
 import '../domain/generation_report.dart';
 
-/// Loaded level data from JSON
+import '../domain/mechanic_flag.dart';
+import '../domain/level_meta.dart';
+
+/// Loaded level data from JSON (with mechanics support)
 class LoadedLevel {
   final int id;
   final int chapter;
@@ -14,6 +17,8 @@ class LoadedLevel {
   final List<List<int>> givens;
   final List<List<int>> solution;
   final double difficultyScore;
+  final List<MechanicFlag> mechanics;
+  final Map<String, dynamic> params;
   
   LoadedLevel({
     required this.id,
@@ -23,9 +28,33 @@ class LoadedLevel {
     required this.givens,
     required this.solution,
     required this.difficultyScore,
-  });
+    List<MechanicFlag>? mechanics,
+    Map<String, dynamic>? params,
+  }) : mechanics = mechanics ?? [MechanicFlag.classic],
+       params = params ?? {};
   
   factory LoadedLevel.fromJson(Map<String, dynamic> json) {
+    // Parse mechanics
+    final mechanics = <MechanicFlag>[];
+    if (json['mechanics'] != null) {
+      final mechanicsList = json['mechanics'] as List;
+      for (final m in mechanicsList) {
+        final flag = MechanicFlagExtension.fromString(m as String);
+        if (flag != null) {
+          mechanics.add(flag);
+        }
+      }
+    }
+    // Default to classic if no mechanics specified
+    if (mechanics.isEmpty) {
+      mechanics.add(MechanicFlag.classic);
+    }
+    
+    // Parse params
+    final params = json['params'] != null
+        ? Map<String, dynamic>.from(json['params'] as Map)
+        : <String, dynamic>{};
+    
     return LoadedLevel(
       id: json['id'] as int,
       chapter: json['chapter'] as int,
@@ -38,6 +67,19 @@ class LoadedLevel {
           .map((row) => (row as List).map((e) => e as int).toList())
           .toList(),
       difficultyScore: (json['difficultyScore'] as num).toDouble(),
+      mechanics: mechanics,
+      params: params,
+    );
+  }
+  
+  /// Convert to LevelMeta
+  LevelMeta toLevelMeta() {
+    return LevelMeta(
+      chapter: chapter,
+      level: level,
+      size: size,
+      mechanics: mechanics,
+      params: params,
     );
   }
 }
@@ -96,53 +138,223 @@ class LevelPackIndex {
 }
 
 /// Runtime level loader and validator
+/// CRASH-PROOF: Handles errors gracefully in release, fails loudly in debug
 class LevelLoader {
   static LevelPackIndex? _cachedIndex;
+  static bool _verificationComplete = false;
   
   /// Load the level pack index
-  static Future<LevelPackIndex> loadIndex() async {
+  /// Throws LevelLoadException in debug, returns null in release (graceful failure)
+  static Future<LevelPackIndex?> loadIndex({bool throwOnError = true}) async {
     if (_cachedIndex != null) {
-      return _cachedIndex!;
+      return _cachedIndex;
     }
     
     try {
       final jsonString = await rootBundle.loadString('assets/levels/index.json');
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
+      
+      // Validate schema
+      if (json['version'] == null || json['chapters'] == null) {
+        final error = 'Invalid index.json schema: missing required fields';
+        if (kDebugMode || throwOnError) {
+          throw LevelLoadException(error);
+        }
+        debugPrint('[LEVELS] $error');
+        return null;
+      }
+      
       _cachedIndex = LevelPackIndex.fromJson(json);
-      return _cachedIndex!;
+      return _cachedIndex;
+    } on PlatformException catch (e) {
+      // File not found or asset error
+      final error = 'Failed to load index.json: ${e.message}';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return null;
+    } on FormatException catch (e) {
+      // JSON parse error
+      final error = 'Invalid JSON in index.json: ${e.message}';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return null;
     } catch (e) {
-      throw LevelLoadException('Failed to load index.json: $e');
+      final error = 'Unexpected error loading index.json: $e';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return null;
     }
   }
   
   /// Load a specific chapter
-  static Future<List<LoadedLevel>> loadChapter(int chapter) async {
-    final index = await loadIndex();
+  /// Returns empty list in release on error, throws in debug
+  static Future<List<LoadedLevel>> loadChapter(int chapter, {bool throwOnError = true}) async {
+    final index = await loadIndex(throwOnError: throwOnError);
+    if (index == null) {
+      if (throwOnError) {
+        throw LevelLoadException('Cannot load chapter $chapter: index not available');
+      }
+      return [];
+    }
+    
     final chapterMeta = index.chapters.firstWhere(
       (c) => c.chapter == chapter,
-      orElse: () => throw LevelLoadException('Chapter $chapter not found in index'),
+      orElse: () {
+        if (kDebugMode || throwOnError) {
+          throw LevelLoadException('Chapter $chapter not found in index');
+        }
+        return ChapterMetadata(
+          chapter: chapter,
+          gridSize: 4,
+          levelCount: 0,
+          difficultyLabel: 'Unknown',
+          file: 'chapter_${chapter.toString().padLeft(2, '0')}.json',
+        );
+      },
     );
     
     try {
       final jsonString = await rootBundle.loadString('assets/levels/${chapterMeta.file}');
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
+      
+      // Validate schema
+      if (json['levels'] == null || json['levels'] is! List) {
+        final error = 'Invalid chapter JSON schema: missing or invalid "levels" field';
+        if (kDebugMode || throwOnError) {
+          throw LevelLoadException('Failed to load chapter $chapter: $error');
+        }
+        debugPrint('[LEVELS] Chapter $chapter: $error');
+        return [];
+      }
+      
       final levelsJson = json['levels'] as List;
       
-      return levelsJson
-          .map((l) => LoadedLevel.fromJson(l as Map<String, dynamic>))
-          .toList();
+      // Parse levels with error handling
+      final levels = <LoadedLevel>[];
+      for (int i = 0; i < levelsJson.length; i++) {
+        try {
+          final levelJson = levelsJson[i] as Map<String, dynamic>;
+          levels.add(LoadedLevel.fromJson(levelJson));
+        } catch (e) {
+          final error = 'Failed to parse level $i in chapter $chapter: $e';
+          if (kDebugMode) {
+            throw LevelLoadException(error);
+          }
+          debugPrint('[LEVELS] $error');
+          // Skip invalid level in release
+        }
+      }
+      
+      return levels;
+    } on PlatformException catch (e) {
+      final error = 'Failed to load chapter $chapter file: ${e.message}';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return [];
+    } on FormatException catch (e) {
+      final error = 'Invalid JSON in chapter $chapter: ${e.message}';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return [];
     } catch (e) {
-      throw LevelLoadException('Failed to load chapter $chapter: $e');
+      final error = 'Unexpected error loading chapter $chapter: $e';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return [];
     }
   }
   
   /// Load a specific level
-  static Future<LoadedLevel> loadLevel(int chapter, int level) async {
-    final levels = await loadChapter(chapter);
+  /// Returns null in release on error, throws in debug
+  static Future<LoadedLevel?> loadLevel(int chapter, int level, {bool throwOnError = true}) async {
+    final levels = await loadChapter(chapter, throwOnError: throwOnError);
+    if (levels.isEmpty) {
+      if (throwOnError) {
+        throw LevelLoadException('Cannot load level $level from Chapter $chapter: chapter not available');
+      }
+      return null;
+    }
+    
     try {
       return levels.firstWhere((l) => l.level == level);
     } catch (e) {
-      throw LevelLoadException('Level $level not found in Chapter $chapter');
+      final error = 'Level $level not found in Chapter $chapter (available: ${levels.map((l) => l.level).join(", ")})';
+      if (kDebugMode || throwOnError) {
+        throw LevelLoadException(error);
+      }
+      debugPrint('[LEVELS] $error');
+      return null;
+    }
+  }
+  
+  /// Runtime verification: Check that level packs are valid
+  /// Logs summary in debug, returns verification result
+  static Future<LevelVerificationResult> verifyLevelPacks() async {
+    if (_verificationComplete) {
+      return LevelVerificationResult(success: true, message: 'Already verified');
+    }
+    
+    try {
+      final index = await loadIndex(throwOnError: true);
+      if (index == null) {
+        return LevelVerificationResult(
+          success: false,
+          message: 'Failed to load index.json',
+        );
+      }
+      
+      int totalLevels = 0;
+      final chapterCounts = <int, int>{};
+      
+      for (final chapterMeta in index.chapters) {
+        final levels = await loadChapter(chapterMeta.chapter, throwOnError: false);
+        chapterCounts[chapterMeta.chapter] = levels.length;
+        totalLevels += levels.length;
+        
+        // Verify level count matches metadata
+        if (levels.length != chapterMeta.levelCount) {
+          if (kDebugMode) {
+            debugPrint('[LEVELS] WARNING: Chapter ${chapterMeta.chapter} has ${levels.length} levels, but metadata says ${chapterMeta.levelCount}');
+          }
+        }
+      }
+      
+      _verificationComplete = true;
+      
+      if (kDebugMode) {
+        debugPrint('[LEVELS] Verification complete: ${index.chapters.length} chapters, $totalLevels total levels');
+        for (final entry in chapterCounts.entries) {
+          debugPrint('[LEVELS]   Chapter ${entry.key}: ${entry.value} levels');
+        }
+      }
+      
+      return LevelVerificationResult(
+        success: true,
+        message: 'Loaded ${index.chapters.length} chapters, $totalLevels levels',
+        chapterCounts: chapterCounts,
+        totalLevels: totalLevels,
+      );
+    } catch (e) {
+      final error = 'Verification failed: $e';
+      if (kDebugMode) {
+        debugPrint('[LEVELS] ERROR: $error');
+      }
+      return LevelVerificationResult(
+        success: false,
+        message: error,
+      );
     }
   }
   
@@ -174,23 +386,19 @@ class LevelLoader {
     }
     
     // 2. Rules validation (givens must be valid)
-    final validator = GridValidator(level.size);
-    for (int r = 0; r < level.size; r++) {
-      for (int c = 0; c < level.size; c++) {
-        final value = level.givens[r][c];
-        if (value != 0) { // Not empty
-          final violations = validator.checkMove(level.givens, r, c, value);
-          if (violations.isNotEmpty) {
-            issues.add('Givens violation at [$r, $c]: ${violations.map((v) => v.type.name).join(", ")}');
-          }
-        }
-      }
+    final givensViolations = GridValidator.validatePartialGrid(level.givens);
+    if (givensViolations.isNotEmpty) {
+      issues.add('Givens violations: ${givensViolations.map((v) => v.message).join(", ")}');
     }
     
     // 3. Solution validation (must be complete and valid)
-    final solutionViolations = validator.validateComplete(level.solution);
-    if (solutionViolations.isNotEmpty) {
-      issues.add('Solution invalid: ${solutionViolations.map((v) => v.type.name).join(", ")}');
+    if (!GridValidator.isValidGrid(level.solution)) {
+      final solutionViolations = GridValidator.validatePartialGrid(level.solution);
+      if (solutionViolations.isNotEmpty) {
+        issues.add('Solution invalid: ${solutionViolations.map((v) => v.message).join(", ")}');
+      } else {
+        issues.add('Solution invalid: Grid does not follow Takuzu rules');
+      }
     }
     
     // 4. Uniqueness check (optional, expensive)
@@ -256,5 +464,20 @@ class LevelLoadException implements Exception {
   
   @override
   String toString() => 'LevelLoadException: $message';
+}
+
+/// Verification result for level packs
+class LevelVerificationResult {
+  final bool success;
+  final String message;
+  final Map<int, int>? chapterCounts;
+  final int? totalLevels;
+  
+  LevelVerificationResult({
+    required this.success,
+    required this.message,
+    this.chapterCounts,
+    this.totalLevels,
+  });
 }
 

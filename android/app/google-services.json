@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "867283777340",
+    "project_id": "tango-logic",
+    "storage_bucket": "tango-logic.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867283777340:android:e3418584c49e87f40d5039",
+        "android_client_info": {
+          "package_name": "com.example.sun_moon_puzzle"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "867283777340-m3864llvec9j9gojpsfa0c7li2hb7dk7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCBYrIz1is39fOJTJpvRRgR46W2QRS607Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "867283777340-m3864llvec9j9gojpsfa0c7li2hb7dk7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
