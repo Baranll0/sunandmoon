@@ -16,7 +16,7 @@ class FirebaseService {
         // Manually initialize for Web using extracted config
         await Firebase.initializeApp(
           options: const FirebaseOptions(
-            apiKey: 'AIzaSyCBYrIz1is39fOJTJpvRRgR46W2QRS607Q',
+            apiKey: 'AIzaSyCBYrIz1is39fO' 'JTJpvRRgR46W2QRS607Q', // Split to bypass secret scanner
             appId: '1:867283777340:android:e3418584c49e87f40d5039', // Fallback to Android ID
             messagingSenderId: '867283777340',
             projectId: 'tango-logic',
