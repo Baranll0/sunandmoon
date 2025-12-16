@@ -1,0 +1,46 @@
+name: Build Release App Bundle
+
+on:
+  workflow_dispatch:  # Manual trigger
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.4'
+          channel: 'stable'
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Generate code (build_runner)
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+        continue-on-error: false
+      
+      - name: Build App Bundle
+        # Uses the 'release' signing config which points to committed debug.keystore
+        run: flutter build appbundle --release
+      
+      - name: Upload App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
