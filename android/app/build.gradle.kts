@@ -31,13 +31,18 @@ android {
         versionName = flutter.versionName
     }
 
+    val keystoreProperties = java.util.Properties()
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+    }
+
     signingConfigs {
         create("release") {
-            // Use the committed debug keystore for release builds to ensure consistent SHA-1
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: "androiddebugkey"
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: "android"
+            storeFile = if (keystoreProperties["storeFile"] != null) file(keystoreProperties["storeFile"] as String) else file("debug.keystore")
+            storePassword = keystoreProperties["storePassword"] as String? ?: "android"
         }
     }
 

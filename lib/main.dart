@@ -10,6 +10,7 @@ import 'core/services/settings_service.dart';
 import 'core/services/firebase_service.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/sync_provider.dart';
+import 'core/services/ad_service.dart';
 import 'core/data/level_loader.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/auth_gate.dart';
@@ -44,6 +45,13 @@ void main() async {
 
   // Initialize settings
   await _initializeSettings();
+
+  // Initialize AdService
+  try {
+    await AdService.instance.initialize();
+  } catch (e) {
+    debugPrint('AdService initialization failed: $e');
+  }
   
   // Verify level packs (non-blocking)
   _verifyLevelPacks();

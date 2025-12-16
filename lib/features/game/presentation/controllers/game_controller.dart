@@ -19,6 +19,7 @@ import '../../../../core/domain/mechanic_flag.dart';
 import '../../../../core/repositories/game_state_repository.dart';
 import '../../../../core/providers/sync_providers.dart';
 import '../../../../core/services/sync_manager.dart';
+import '../../../../core/services/ad_service.dart';
 import '../../data/repositories/game_repository.dart';
 import '../utils/game_utils.dart';
 
@@ -686,6 +687,9 @@ class GameStateNotifier extends _$GameStateNotifier {
         if (nextLevel != null) {
           await ProgressService.saveMaxUnlockedLevel(nextLevel);
         }
+        
+        // Trigger Ad Logic (Every 3 levels)
+        AdService.instance.onLevelComplete();
       }
       
       // CRITICAL: Update state to mark as completed

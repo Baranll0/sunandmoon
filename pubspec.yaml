@@ -47,6 +47,7 @@ dependencies:
   equatable: ^2.0.5
   uuid: ^4.2.1
   connectivity_plus: ^6.0.5
+  google_mobile_ads: ^6.0.0
 
 dev_dependencies:
   flutter_test:
