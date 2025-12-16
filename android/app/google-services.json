@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:867283777340:android:e3418584c49e87f40d5039",
         "android_client_info": {
-          "package_name": "com.example.sun_moon_puzzle"
+          "package_name": "com.baran.sun_moon_puzzle"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "867283777340-9nq98ogcr1e0h2aeff2sse20jca8rec5.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.sun_moon_puzzle",
+            "package_name": "com.baran.sun_moon_puzzle",
             "certificate_hash": "87a60e74955aa79f389e046ab74316f164d918dc"
           }
         },
@@ -25,7 +25,7 @@
           "client_id": "867283777340-h7tiom3kp1itith21mmsbus7b8b4l1s1.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.sun_moon_puzzle",
+            "package_name": "com.baran.sun_moon_puzzle",
             "certificate_hash": "ceefdbe907da615bcf0d6bf40858a67cf886c804"
           }
         },
