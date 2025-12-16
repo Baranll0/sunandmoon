@@ -34,6 +34,11 @@ jobs:
         run: flutter pub run build_runner build --delete-conflicting-outputs
         continue-on-error: false
       
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          echo "${{ secrets.KEY_PROPERTIES }}" > android/key.properties
+
       - name: Build App Bundle
         # Uses the 'release' signing config which points to committed debug.keystore
         run: flutter build appbundle --release
