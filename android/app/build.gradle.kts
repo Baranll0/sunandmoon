@@ -6,6 +6,9 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
 android {
     namespace = "com.example.sun_moon_puzzle"
     compileSdk = flutter.compileSdkVersion
@@ -31,14 +34,14 @@ android {
         versionName = flutter.versionName
     }
 
-    val keystoreProperties = java.util.Properties()
-    val keystorePropertiesFile = rootProject.file("key.properties")
-    if (keystorePropertiesFile.exists()) {
-        keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
-    }
-
     signingConfigs {
         create("release") {
+            val keystoreProperties = Properties()
+            val keystorePropertiesFile = rootProject.file("key.properties")
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+            }
+
             keyAlias = keystoreProperties["keyAlias"] as String? ?: "androiddebugkey"
             keyPassword = keystoreProperties["keyPassword"] as String? ?: "android"
             storeFile = if (keystoreProperties["storeFile"] != null) file(keystoreProperties["storeFile"] as String) else file("debug.keystore")
