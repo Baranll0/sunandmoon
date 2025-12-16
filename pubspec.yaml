@@ -1,7 +1,7 @@
 name: sun_moon_puzzle
 description: Tango Logic - Sun & Moon Puzzle - A production-ready logic puzzle game based on Takuzu/Binairo rules
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
