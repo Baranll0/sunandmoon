@@ -1,6 +1,16 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../controllers/game_controller.dart';
+import '../../../../core/localization/locale_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/services/hint_service.dart';
+import '../overlays/help_overlay.dart';
 import '../../../../core/constants/game_constants.dart';
 
-// ... imports ...
+/// Control panel widget with toolbar and game actions
+class ControlPanel extends ConsumerWidget {
+  const ControlPanel({super.key});
+
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
