@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../../core/utils/puzzle_generator.dart';
+import '../../../../core/utils/puzzle_solver.dart';
 import '../../../../core/services/level_manager.dart';
 import '../../../../core/data/level_loader.dart';
 import '../../../../core/domain/mechanic_flag.dart';

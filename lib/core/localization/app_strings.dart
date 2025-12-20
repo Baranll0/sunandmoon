@@ -53,6 +53,9 @@ class AppStrings {
   String get clear => _getString('clear', en: 'Clear', tr: 'Temizle', de: 'Löschen', fr: 'Effacer');
   String get pencil => _getString('pencil', en: 'Pencil', tr: 'Not', de: 'Notiz', fr: 'Crayon');
   String get hint => _getString('hint', en: 'Hint', tr: 'İpucu', de: 'Hinweis', fr: 'Indice');
+  String get sun => _getString('sun', en: 'Sun', tr: 'Güneş', de: 'Sonne', fr: 'Soleil');
+  String get moon => _getString('moon', en: 'Moon', tr: 'Ay', de: 'Mond', fr: 'Lune');
+  String get erase => _getString('erase', en: 'Erase', tr: 'Sil', de: 'Löschen', fr: 'Effacer');
   String get noHintsAvailable => _getString('noHintsAvailable', en: 'No Hints Available', tr: 'İpucu Yok', de: 'Keine Hinweise verfügbar', fr: 'Aucun indice disponible');
   String get comeBackTomorrow => _getString('comeBackTomorrow', en: 'Come back tomorrow!', tr: 'Yarın tekrar gel!', de: 'Kommen Sie morgen wieder!', fr: 'Revenez demain !');
   String get noteModeDescription => _getString('noteModeDescription', en: 'Note Mode: Tap to mark possibilities without errors.', tr: 'Not Modu: Hatalar olmadan olasılıkları işaretlemek için dokunun.', de: 'Notizmodus: Tippen Sie, um Möglichkeiten ohne Fehler zu markieren.', fr: 'Mode note : Appuyez pour marquer les possibilités sans erreurs.');
