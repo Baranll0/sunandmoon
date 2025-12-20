@@ -36,6 +36,7 @@ class AppStrings {
   String get exitAppConfirm => _getString('exitAppConfirm', en: 'Are you sure you want to exit?', tr: 'Oyundan çıkmak istediğinize emin misiniz?', de: 'Sind Sie sicher, dass Sie beenden möchten?', fr: 'Êtes-vous sûr de vouloir quitter ?');
   String get cancel => _getString('cancel', en: 'Cancel', tr: 'İptal', de: 'Abbrechen', fr: 'Annuler');
   String get exit => _getString('exit', en: 'Exit', tr: 'Çık', de: 'Beenden', fr: 'Quitter');
+  String get gotIt => _getString('gotIt', en: 'Got it', tr: 'Anladım', de: 'Verstanden', fr: 'Compris');
 
   // Victory Dialog
   String get puzzleSolved => _getString('puzzleSolved', en: 'Puzzle Solved!', tr: 'Bulmaca Çözüldü!', de: 'Rätsel gelöst!', fr: 'Puzzle résolu !');
