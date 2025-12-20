@@ -4,7 +4,7 @@ import '../controllers/game_controller.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/hint_service.dart';
-import '../overlays/help_overlay.dart';
+import 'help_overlay.dart';
 import '../../../../core/constants/game_constants.dart';
 
 /// Control panel widget with toolbar and game actions
