@@ -4,7 +4,6 @@ import '../controllers/game_controller.dart';
 import '../../../../core/localization/locale_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/hint_service.dart';
-import 'help_overlay.dart';
 import '../../../../core/constants/game_constants.dart';
 
 /// Control panel widget with toolbar and game actions
@@ -134,11 +133,30 @@ class ControlPanel extends ConsumerWidget {
   }
 
   void _showHelpOverlay(BuildContext context) {
+    final strings = ref.read(appStringsProvider);
     showDialog(
       context: context,
-      barrierColor: Colors.transparent, // Helper handles dimming
-      builder: (context) => HelpOverlay(
-        onClose: () => Navigator.of(context).pop(),
+      builder: (context) => AlertDialog(
+        title: Text(strings.howToPlay),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(strings.rule1, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 8),
+              Text(strings.rule2, style: const TextStyle(fontSize: 14)),
+              const SizedBox(height: 8),
+              Text(strings.rule3, style: const TextStyle(fontSize: 14)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(strings.gotIt),
+          ),
+        ],
       ),
     );
   }
