@@ -35,7 +35,8 @@ class LevelManager {
 
   /// Get grid size directly from level ID
   static int getGridSize(int levelId) {
-    return levelId <= 10 ? 4 : 6;
+    if (levelId <= 10) return 4;
+    return 6;
   }
 
   /// DEPRECATED: Use getGridSizeForChapter(chapter, level) instead
@@ -50,11 +51,11 @@ class LevelManager {
   /// - Chapter 2-5: 20 levels each
   /// - Chapter 6+: 20 levels (procedural)
   static int getLevelsPerChapter(int chapter) {
-    if (chapter == 1) {
-      return 10;
-    } else {
-      return 20; // Chapter 2+: 20 levels each
-    }
+    if (chapter == 1) return 10;
+    if (chapter == 2) return 60;
+    if (chapter == 3) return 70;
+    if (chapter == 4) return 60;
+    return 20; // Chapter 5+: 20 levels each
   }
 
   /// Calculate difficulty factor based on level ID
@@ -71,12 +72,14 @@ class LevelManager {
   static double calculateDifficultyFactor(int chapter, int level) {
     final levelId = getLevelId(chapter, level);
     
-    if (levelId <= 3) {
-      return 0.55; // Levels 1-3: Remove 55% (Keep 45% -> ~7/16) - Satisfies Min 2 Empty
+    if (levelId == 1) {
+      return 0.50; // Level 1: Remove 50%
+    } else if (levelId <= 3) {
+      return 0.45; // Level 2-3: Remove 45% (Easier)
     } else if (levelId <= 10) {
-      return 0.60; // Chapter 1: Remove 60% (Keep 40% -> ~6/16)
+      return 0.50; // Chapter 1: Remove 50%
     } else if (levelId <= 30) {
-      return 0.55; // Chapter 2: Medium
+      return 0.55; // Chapter 2 Early: Remove 55%
     } else if (levelId <= 50) {
       return 0.60; // Chapter 3: Harder
     } else if (levelId <= 70) {

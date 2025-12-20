@@ -36,6 +36,9 @@ class GameStatus with _$GameStatus {
     
     /// Number of mistakes made (invalid placements)
     @Default(0) int mistakeCount,
+
+    /// Currently selected tool (1=Sun, 2=Moon, 0=Erase)
+    @Default(1) int selectedTool,
   }) = _GameStatus;
 
   factory GameStatus.fromJson(Map<String, dynamic> json) =>

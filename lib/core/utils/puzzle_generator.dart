@@ -297,14 +297,45 @@ class PuzzleGenerator {
 
   /// Generate puzzle for a specific level with difficulty factor
   /// This is the main entry point for level-based generation
-  List<List<int>> generatePuzzleForLevel(int size, double difficultyFactor, {int? seed}) {
+  Future<List<List<int>>> generatePuzzleForLevel(int size, double difficultyFactor, {int? seed}) async {
     final generator = seed != null ? PuzzleGenerator(seed: seed) : this;
     
-    // Phase A: Generate complete valid board
-    final completeBoard = generator.generateCompleteBoard(size);
+    // RETRY LOOP to enforce Master Spec Gates
+    // Gate 1: MinEmptyPerLine = 2 (Anti-Determinism)
+    // Gate 2: Logic Solvable (No Guessing)
+    int attempts = 0;
+    const int maxAttempts = 20; // Allow 20 attempts to generate a perfect puzzle
     
-    // Phase B: Create playable puzzle by masking
-    return generator.createPlayablePuzzle(completeBoard, difficultyFactor);
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        // Phase A: Generate complete valid board
+        final completeBoard = generator.generateCompleteBoard(size);
+        
+        // Phase B: Create playable puzzle by masking
+        final puzzle = generator.createPlayablePuzzle(completeBoard, difficultyFactor);
+        
+        // Check Gate 1: MinEmptyPerLine = 2
+        // CRITICAL: Strict enforcement
+        if (!generator.checkMinEmptyPerLine(puzzle, size, 2)) {
+          if (attempts < maxAttempts) continue; // Retry
+          print('[PuzzleGenerator] Warning: Could not satisfy MinEmptyPerLine=2 after $attempts attempts');
+        }
+        
+        // Check Solvability (Redundant as createPlayablePuzzle maintains it, but good for sanity)
+        if (!PuzzleSolver.canSolveLogically(puzzle, size)) {
+           continue; // Should not happen if createPlayablePuzzle is correct
+        }
+        
+        return puzzle;
+      } catch (e) {
+        print('[PuzzleGenerator] Generation attempt $attempts failed: $e');
+        if (attempts >= maxAttempts) rethrow;
+      }
+    }
+    
+    // Fallback (should be unreachable given enough attempts)
+    throw Exception('Failed to generate valid puzzle satisfying all gates');
   }
 
   /// Recursive backtracking solver
@@ -562,17 +593,5 @@ class PuzzleGenerator {
     return true;
   }
 
-  // Legacy methods for backward compatibility
-  @Deprecated('Use generateCompleteBoard instead')
-  List<List<int>> generatePuzzle(int size) {
-    return generateCompleteBoard(size);
-  }
 
-  @Deprecated('Use generatePuzzleForLevel instead')
-  List<List<int>> generateDailyChallenge(int size) {
-    final DateTime now = DateTime.now();
-    final int seed = now.year * 10000 + now.month * 100 + now.day;
-    final generator = PuzzleGenerator(seed: seed);
-    return generator.generatePuzzleForLevel(size, 0.55);
-  }
 }

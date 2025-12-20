@@ -7,8 +7,7 @@ enum MechanicFlag {
   /// Board partitioned into regions; each region must have equal Sun/Moon
   regions,
   
-  /// More "fixed locks" or special locks beyond normal givens
-  lockedCells,
+
   
   /// Extra pattern rules beyond base (e.g., forbidding more patterns or enforcing symmetry)
   advancedNoThree,

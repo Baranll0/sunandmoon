@@ -1,15 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/hint_service.dart';
-import '../../../../core/localization/locale_provider.dart';
-import '../../../settings/screens/settings_screen.dart';
-import '../controllers/game_controller.dart';
-import 'help_overlay.dart';
+import '../../../../core/constants/game_constants.dart';
 
-/// Control Panel - Bottom bar with game controls
-class ControlPanel extends ConsumerWidget {
-  const ControlPanel({super.key});
+// ... imports ...
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -20,6 +11,7 @@ class ControlPanel extends ConsumerWidget {
     final status = gameState.status;
     final canUndo = gameState.undoStack.isNotEmpty;
     final canRedo = gameState.redoStack.isNotEmpty;
+    final selectedTool = status.selectedTool; // Access selectedTool
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -38,63 +30,89 @@ class ControlPanel extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // First row: Main controls
+            // Row 1: Tools (Sun, Moon, Eraser)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Sun Tool
+                  _ToolButton(
+                    icon: Icons.wb_sunny,
+                    label: strings.sun,
+                    color: AppTheme.sunOrange,
+                    isSelected: selectedTool == GameConstants.cellSun,
+                    onPressed: () => gameNotifier.selectTool(GameConstants.cellSun),
+                  ),
+                  const SizedBox(width: 8),
+                  // Moon Tool
+                  _ToolButton(
+                    icon: Icons.nightlight_round,
+                    label: strings.moon,
+                    color: AppTheme.moonBlue,
+                    isSelected: selectedTool == GameConstants.cellMoon,
+                    onPressed: () => gameNotifier.selectTool(GameConstants.cellMoon),
+                  ),
+                  const SizedBox(width: 8),
+                  // Eraser Tool
+                  _ToolButton(
+                    icon: Icons.cleaning_services_outlined, // or highlight_off
+                    label: strings.erase, // Need string or hardcode for now
+                    color: AppTheme.inkLight,
+                    isSelected: selectedTool == GameConstants.cellEmpty,
+                    onPressed: () => gameNotifier.selectTool(GameConstants.cellEmpty),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Row 2: Actions
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Undo Button
+                // Undo
                 _ControlButton(
                   icon: Icons.undo,
                   label: strings.undo,
                   onPressed: canUndo ? () => gameNotifier.undo() : null,
                   isActive: canUndo,
                 ),
-                // Redo Button
+                // Redo
                 _ControlButton(
                   icon: Icons.redo,
                   label: strings.redo,
                   onPressed: canRedo ? () => gameNotifier.redo() : null,
                   isActive: canRedo,
                 ),
-                // Clear Board Button
-                _ControlButton(
-                  icon: Icons.clear_all,
-                  label: strings.clear,
-                  onPressed: () => gameNotifier.clearBoard(),
-                  isActive: false,
-                ),
-                // Pencil Mode Button
+                // Pencil Mode
                 _ControlButton(
                   icon: Icons.edit,
                   label: strings.pencil,
                   onPressed: () {
                     final wasActive = status.pencilMode;
                     gameNotifier.togglePencilMode();
-                    // Show tooltip/toast when toggling ON
                     if (!wasActive && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(strings.noteModeDescription),
-                          duration: const Duration(seconds: 2),
+                          duration: const Duration(seconds: 1),
                           behavior: SnackBarBehavior.floating,
-                          backgroundColor: AppTheme.inkDark.withOpacity(0.9),
                         ),
                       );
                     }
                   },
                   isActive: status.pencilMode,
+                  activeColor: AppTheme.inkDark, // Distinct active color
                 ),
-                // Hint Button
+                // Hint
                 _HintButton(
                   onPressed: () => gameNotifier.showHint(context),
                 ),
-                // Help Button
+                // Menu/Help
                 _ControlButton(
-                  icon: Icons.help_outline,
-                  label: strings.help,
-                  onPressed: () {
-                      _showHelpOverlay(context);
-                  },
+                  icon: Icons.menu,
+                  label: strings.menu,
+                  onPressed: () => _showHelpOverlay(context),
                   isActive: false,
                 ),
               ],
@@ -172,17 +190,20 @@ class _ControlButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool isActive;
+  final Color? activeColor; // Added optional active color
 
   const _ControlButton({
     required this.icon,
     required this.label,
     this.onPressed,
     this.isActive = false,
+    this.activeColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final bool isEnabled = onPressed != null;
+    final effectiveActiveColor = activeColor ?? AppTheme.sunOrange;
 
     return Expanded(
       child: Padding(
@@ -196,7 +217,7 @@ class _ControlButton extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
                 color: isActive
-                    ? AppTheme.sunOrange.withOpacity(0.1)
+                    ? effectiveActiveColor.withOpacity(0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -207,7 +228,7 @@ class _ControlButton extends StatelessWidget {
                     icon,
                     size: 24,
                     color: isEnabled
-                        ? (isActive ? AppTheme.sunOrange : AppTheme.inkDark)
+                        ? (isActive ? effectiveActiveColor : AppTheme.inkDark)
                         : AppTheme.inkLight.withOpacity(0.5),
                   ),
                   const SizedBox(height: 4),
@@ -216,7 +237,7 @@ class _ControlButton extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 10,
                       color: isEnabled
-                          ? (isActive ? AppTheme.sunOrange : AppTheme.inkDark)
+                          ? (isActive ? effectiveActiveColor : AppTheme.inkDark)
                           : AppTheme.inkLight.withOpacity(0.5),
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                     ),
@@ -308,6 +329,76 @@ class _HintButtonState extends ConsumerState<_HintButton> {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tool selection button (Sun, Moon, Eraser)
+class _ToolButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  const _ToolButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected ? color : color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? color : Colors.transparent,
+                width: 2,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      )
+                    ]
+                  : [],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 28,
+                  color: isSelected ? Colors.white : color,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? Colors.white : color,
+                  ),
+                ),
+              ],
             ),
           ),
         ),

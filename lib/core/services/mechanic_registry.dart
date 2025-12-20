@@ -10,10 +10,9 @@ class MechanicRegistry {
         return strings.mechanicClassicTitle;
       case MechanicFlag.regions:
         return strings.mechanicRegionsTitle;
-      case MechanicFlag.lockedCells:
-        return strings.mechanicLockedCellsTitle;
       case MechanicFlag.advancedNoThree:
         return strings.mechanicAdvancedNoThreeTitle;
+
       case MechanicFlag.hiddenRule:
         return strings.mechanicHiddenRuleTitle;
       case MechanicFlag.moveLimit:
@@ -36,8 +35,6 @@ class MechanicRegistry {
         return strings.mechanicClassicDescription;
       case MechanicFlag.regions:
         return strings.mechanicRegionsDescription;
-      case MechanicFlag.lockedCells:
-        return strings.mechanicLockedCellsDescription;
       case MechanicFlag.advancedNoThree:
         return strings.mechanicAdvancedNoThreeDescription;
       case MechanicFlag.hiddenRule:
@@ -62,8 +59,6 @@ class MechanicRegistry {
         return 'classic';
       case MechanicFlag.regions:
         return 'grid';
-      case MechanicFlag.lockedCells:
-        return 'lock';
       case MechanicFlag.advancedNoThree:
         return 'pattern';
       case MechanicFlag.hiddenRule:
@@ -88,8 +83,6 @@ class MechanicRegistry {
         return {};
       case MechanicFlag.regions:
         return {'regionLayoutId': 'default'};
-      case MechanicFlag.lockedCells:
-        return {'lockedCount': 0};
       case MechanicFlag.advancedNoThree:
         return {'patternLevel': 1};
       case MechanicFlag.hiddenRule:
@@ -121,9 +114,9 @@ class MechanicRegistry {
       } else if (level <= 30) {
         return [MechanicFlag.regions];
       } else if (level <= 45) {
-        return [MechanicFlag.regions, MechanicFlag.lockedCells];
+        return [MechanicFlag.regions];
       } else {
-        return [MechanicFlag.regions, MechanicFlag.lockedCells, MechanicFlag.advancedNoThree];
+        return [MechanicFlag.regions, MechanicFlag.advancedNoThree];
       }
     }
     
@@ -134,11 +127,11 @@ class MechanicRegistry {
       } else if (level <= 30) {
         return [MechanicFlag.regions];
       } else if (level <= 45) {
-        return [MechanicFlag.lockedCells, MechanicFlag.advancedNoThree];
+        return [MechanicFlag.advancedNoThree];
       } else if (level <= 60) {
         return [MechanicFlag.regions, MechanicFlag.hiddenRule];
       } else {
-        return [MechanicFlag.regions, MechanicFlag.lockedCells, MechanicFlag.advancedNoThree];
+        return [MechanicFlag.regions, MechanicFlag.advancedNoThree];
       }
     }
     
@@ -151,7 +144,7 @@ class MechanicRegistry {
       } else if (level <= 45) {
         return [MechanicFlag.classic, MechanicFlag.advancedNoThree, MechanicFlag.mistakeLimit];
       } else {
-        return [MechanicFlag.regions, MechanicFlag.lockedCells, MechanicFlag.advancedNoThree, MechanicFlag.mistakeLimit];
+        return [MechanicFlag.regions, MechanicFlag.advancedNoThree, MechanicFlag.mistakeLimit];
       }
     }
     

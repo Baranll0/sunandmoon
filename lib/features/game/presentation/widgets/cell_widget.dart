@@ -86,9 +86,7 @@ class _CellWidgetState extends State<CellWidget>
             // Highlight overlay
             if (widget.cell.isHighlighted)
               _buildHighlightOverlay(),
-            // Lock icon overlay (lockedCells mechanic)
-            if (widget.cell.isLocked)
-              _buildLockOverlay(),
+
           ],
         ),
       ),
@@ -97,8 +95,8 @@ class _CellWidgetState extends State<CellWidget>
 
   Color _getBackgroundColor() {
     if (widget.cell.isGiven) {
-      // Given cells have a slightly different background
-      return Colors.white.withOpacity(0.7);
+      // Given cells have a distinct grey background
+      return AppTheme.gridLine.withOpacity(0.35);
     }
     return Colors.white;
   }
@@ -204,22 +202,5 @@ class _CellWidgetState extends State<CellWidget>
     );
   }
 
-  Widget _buildLockOverlay() {
-    return Positioned(
-      top: 4,
-      right: 4,
-      child: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: AppTheme.inkDark.withOpacity(0.8),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.lock,
-          size: widget.size * 0.15,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
+
 }

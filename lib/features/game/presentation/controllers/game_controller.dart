@@ -194,7 +194,7 @@ class GameStateNotifier extends _$GameStateNotifier {
     
     // Don't allow editing given cells or locked cells
     final cell = puzzle.currentState[row][col];
-    if (cell.isGiven || cell.isLocked) {
+    if (cell.isGiven) {
       HapticService.heavyImpact();
       SoundService.playError();
       return;
@@ -210,21 +210,43 @@ class GameStateNotifier extends _$GameStateNotifier {
       }
     }
 
-    // Get the value to place
-    int cellValue;
-    if (value != null) {
-      cellValue = value;
+    // Get the value to place from the selected tool
+    final toolValue = state.status.selectedTool;
+    final currentValue = puzzle.currentState[row][col].value;
+    
+    int finalValue;
+    if (toolValue == GameConstants.cellEmpty) {
+      // Eraser always erases
+      finalValue = GameConstants.cellEmpty;
     } else {
-      // Cycle through: empty -> Sun -> Moon -> empty
-      final currentValue = puzzle.currentState[row][col].value;
-      if (currentValue == GameConstants.cellEmpty) {
-        cellValue = GameConstants.cellSun;
-      } else if (currentValue == GameConstants.cellSun) {
-        cellValue = GameConstants.cellMoon;
+      // If tapping with same tool on same value -> Toggle off (Clear)
+      if (currentValue == toolValue) {
+        finalValue = GameConstants.cellEmpty;
       } else {
-        cellValue = GameConstants.cellEmpty;
+        // Else paint the tool value
+        finalValue = toolValue;
       }
     }
+    
+    // If value didn't change, do nothing
+    if (currentValue == finalValue) return;
+
+    // If pencil mode is active, handle pencil marks
+    if (state.status.pencilMode) {
+      // For pencil mode, we toggle the specific mark corresponding to the tool
+      // Eraser clears all marks? Or specific?
+      // Let's say Eraser (0) clears all marks.
+      // Sun/Moon toggles that specific mark.
+      if (toolValue == GameConstants.cellEmpty) {
+         _handlePencilMark(row, col, 0); // Special case for clear all?
+      } else {
+         _handlePencilMark(row, col, toolValue);
+      }
+      return;
+    }
+    
+    // The rest of the logic uses finalValue
+    final cellValue = finalValue; // Re-assign for compatibility with existing code below
 
     // If pencil mode is active, handle pencil marks
     if (state.status.pencilMode) {
@@ -623,6 +645,16 @@ class GameStateNotifier extends _$GameStateNotifier {
     state = state.copyWith(
       status: state.status.copyWith(mode: mode),
     );
+  }
+
+  /// Selects a tool (Sun, Moon, Erase)
+  void selectTool(int toolId) {
+    if (state.status.selectedTool == toolId) return;
+    
+    state = state.copyWith(
+      status: state.status.copyWith(selectedTool: toolId),
+    );
+    HapticService.lightImpact();
   }
 
   /// Saves current state to undo stack

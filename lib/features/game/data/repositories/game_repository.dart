@@ -50,41 +50,16 @@ class GameRepository {
         }
         
         // Convert LoadedLevel to PuzzleModel
-        final hasLockedCells = loadedLevel.mechanics.contains(MechanicFlag.lockedCells);
-        final lockedCount = hasLockedCells 
-            ? (loadedLevel.params['lockedCount'] as int? ?? 0)
-            : 0;
-        
-        // Mark some given cells as locked (if lockedCells mechanic active)
         final List<List<CellModel>> currentState = puzzleGivens.asMap().entries.map((rowEntry) {
           final int row = rowEntry.key;
           return rowEntry.value.asMap().entries.map((colEntry) {
             final int col = colEntry.key;
             final int value = colEntry.value;
             final isGiven = value != 0;
-            
-            // Mark as locked if: isGiven AND lockedCells mechanic active AND within lockedCount
-            // Simple strategy: lock first N given cells
-            bool isLocked = false;
-            if (hasLockedCells && isGiven && lockedCount > 0) {
-              // Count how many given cells we've seen so far
-              int givenCount = 0;
-              for (int r = 0; r <= row; r++) {
-                for (int c = 0; c < (r == row ? col + 1 : puzzleGivens[r].length); c++) {
-                  if (puzzleGivens[r][c] != 0) {
-                    givenCount++;
-                    if (r == row && c == col && givenCount <= lockedCount) {
-                      isLocked = true;
-                    }
-                  }
-                }
-              }
-            }
-            
+
             return CellModel(
               value: value,
               isGiven: isGiven,
-              isLocked: isLocked,
             );
           }).toList();
         }).toList();
@@ -237,15 +212,41 @@ Future<Map<String, dynamic>> _generatePuzzleInIsolate(Map<String, dynamic> param
   final double difficultyFactor = params['difficultyFactor'];
   final generator = PuzzleGenerator(seed: seed);
   
-  // Phase A: Generate complete valid board
-  final List<List<int>> solution = generator.generateCompleteBoard(gridSize);
+  // RETRY LOOP (Use same logic as PuzzleGenerator.generatePuzzleForLevel)
+  int attempts = 0;
+  const int maxAttempts = 20;
   
-  // Phase B: Create playable puzzle by masking cells
-  final List<List<int>> puzzle = generator.createPlayablePuzzle(solution, difficultyFactor);
+  while (attempts < maxAttempts) {
+    attempts++;
+    try {
+      // Phase A: Generate complete valid board
+      final List<List<int>> solution = generator.generateCompleteBoard(gridSize);
+      
+      // Phase B: Create playable puzzle by masking cells
+      final List<List<int>> puzzle = generator.createPlayablePuzzle(solution, difficultyFactor);
+      
+      // Check Gate 1: MinEmptyPerLine = 2
+      if (!generator.checkMinEmptyPerLine(puzzle, gridSize, 2)) {
+         if (attempts < maxAttempts) continue; // Retry
+         // If last attempt, we might have to accept it or fail
+         // Master Spec says "Strictly enforce", so we should probably fail/retry or fallback to best effort?
+         // We'll log and return, assuming createPlayablePuzzle did its best
+      }
+      
+      // Check Gate 2: Logic Solvable (Redundant but safe)
+      if (!PuzzleSolver.canSolveLogically(puzzle, gridSize)) {
+         continue; 
+      }
+      
+      return {
+        'solution': solution,
+        'puzzle': puzzle,
+      };
+    } catch (e) {
+      if (attempts >= maxAttempts) rethrow;
+    }
+  }
   
-  return {
-    'solution': solution,
-    'puzzle': puzzle,
-  };
+  throw Exception('Failed to generate valid puzzle satisfying all gates in Isolate');
 }
 

@@ -13,10 +13,7 @@ class CellModel with _$CellModel {
     /// Whether this cell is a given (pre-filled) or user-placed
     @Default(false) bool isGiven,
     
-    /// Whether this cell is locked (lockedCells mechanic - cannot be edited)
-    @Default(false) bool isLocked,
-    
-    /// Pencil marks (candidate values for note-taking)
+
     @Default([]) List<int> pencilMarks,
     
     /// Whether this cell is currently highlighted (for hints)

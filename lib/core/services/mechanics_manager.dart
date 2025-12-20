@@ -50,13 +50,8 @@ class MechanicsManager {
     if (level < 10) {
       return MechanicsPlan.empty();
     }
-    // Level 10-20: Locked Cells
-    return const MechanicsPlan(
-      mechanics: [MechanicFlag.lockedCells],
-      params: {
-        'lockedCount': 3, // Light: only 3 locked cells
-      },
-    );
+    // Level 10-20: Classic (Locked Cells removed)
+    return MechanicsPlan.empty();
   }
   
   // Chapter 3: Introduce Mistake Limit
@@ -105,26 +100,24 @@ class MechanicsManager {
     
     if (level <= 13) {
       return const MechanicsPlan(
-        mechanics: [MechanicFlag.moveLimit, MechanicFlag.lockedCells],
+        mechanics: [MechanicFlag.moveLimit],
         params: {
           'moveBuffer': 5,
-          'lockedCount': 4,
         },
       );
     } else if (level <= 16) {
       return const MechanicsPlan(
         mechanics: [MechanicFlag.moveLimit, MechanicFlag.mistakeLimit],
         params: {
-          'moveBuffer': 4, // Tighter buffer
+          'moveBuffer': 4,
           'maxMistakes': 3,
         },
       );
     } else {
       return const MechanicsPlan(
-        mechanics: [MechanicFlag.moveLimit, MechanicFlag.regions, MechanicFlag.lockedCells],
+        mechanics: [MechanicFlag.moveLimit, MechanicFlag.regions],
         params: {
           'moveBuffer': 5,
-          'lockedCount': 5,
           'regionCount': 2,
         },
       );

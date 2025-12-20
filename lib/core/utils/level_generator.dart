@@ -273,27 +273,8 @@ class LevelGenerator {
         continue;
       }
       
-      // Apply Mechanics Params (Locked Cells)
+      // Apply Mechanics Params
       final Map<String, dynamic> finalParams = Map.from(mechanicsPlan?.params ?? {});
-      if (mechanicsPlan != null && mechanicsPlan.mechanics.contains(MechanicFlag.lockedCells)) {
-        final lockedCount = finalParams['lockedCount'] as int? ?? 0;
-        if (lockedCount > 0) {
-           final givensIndices = <int>[];
-           for (int r = 0; r < gridSize; r++) {
-             for (int c = 0; c < gridSize; c++) {
-               if (puzzle[r][c] != GameConstants.cellEmpty) {
-                 givensIndices.add(r * gridSize + c);
-               }
-             }
-           }
-           
-           // Shuffle deterministically based on seed + attempt
-           final rng = Random(baseSeed + attempt + 12345);
-           givensIndices.shuffle(rng);
-           
-           finalParams['lockedIndices'] = givensIndices.take(lockedCount).toList();
-        }
-      }
       
       // Success!
       return GenerationResult(
