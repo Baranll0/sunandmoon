@@ -121,7 +121,7 @@ class ControlPanel extends ConsumerWidget {
                 _ControlButton(
                   icon: Icons.menu,
                   label: strings.menu,
-                  onPressed: () => _showHelpOverlay(context),
+                  onPressed: () => _showHelpOverlay(context, ref),
                   isActive: false,
                 ),
               ],
@@ -132,7 +132,7 @@ class ControlPanel extends ConsumerWidget {
     );
   }
 
-  void _showHelpOverlay(BuildContext context) {
+  void _showHelpOverlay(BuildContext context, WidgetRef ref) {
     final strings = ref.read(appStringsProvider);
     showDialog(
       context: context,
