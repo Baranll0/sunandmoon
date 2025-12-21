@@ -95,8 +95,8 @@ class _CellWidgetState extends State<CellWidget>
 
   Color _getBackgroundColor() {
     if (widget.cell.isGiven) {
-      // Given cells have a distinct grey background
-      return AppTheme.gridLine.withOpacity(0.35);
+      // Given cells have a distinct grey background (more visible)
+      return const Color(0xFFE8E8E8); // Light grey, distinct from white
     }
     return Colors.white;
   }
